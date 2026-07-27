@@ -18,6 +18,9 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   isOccupied: boolean;
+  electricityRate: number; // e.g. price per kWh
+  waterRate: number;       // e.g. flat rate or per m3
+  serviceFee: number;      // e.g. flat monthly parking/maintenance fee
 }
 
 export interface Tenant {
@@ -37,6 +40,8 @@ export interface Lease {
   monthlyRent: number;
   securityDeposit: number;
   status: LeaseStatus;
+  tenantPhoto?: string;   // Image URI reference
+  contractPhoto?: string; // Image URI reference
 }
 
 export interface Payment {
@@ -49,7 +54,7 @@ export interface Payment {
   notes: string;
 }
 
-// Initial Mock Data
+// Initial Mock Data with full breakdown configurations
 let properties: Property[] = [
   {
     id: 'prop-1',
@@ -59,7 +64,10 @@ let properties: Property[] = [
     rentAmount: 1200,
     bedrooms: 2,
     bathrooms: 1,
-    isOccupied: true
+    isOccupied: true,
+    electricityRate: 3500,
+    waterRate: 100000,
+    serviceFee: 50000
   },
   {
     id: 'prop-2',
@@ -69,7 +77,23 @@ let properties: Property[] = [
     rentAmount: 2500,
     bedrooms: 4,
     bathrooms: 2.5,
-    isOccupied: false
+    isOccupied: false,
+    electricityRate: 4000,
+    waterRate: 120000,
+    serviceFee: 60000
+  },
+  {
+    id: 'prop-3',
+    name: 'Oakridge Apt 2A',
+    address: '456 Greenway Blvd, Room 104',
+    propertyType: 'Apartment',
+    rentAmount: 1100,
+    bedrooms: 1,
+    bathrooms: 1,
+    isOccupied: true,
+    electricityRate: 3500,
+    waterRate: 100000,
+    serviceFee: 50000
   }
 ];
 
@@ -90,6 +114,7 @@ let tenants: Tenant[] = [
   }
 ];
 
+// Mocking multiple active leases for Jane Tenant (tenant-1) to verify Room Switcher
 let leases: Lease[] = [
   {
     id: 'lease-1',
@@ -99,7 +124,21 @@ let leases: Lease[] = [
     endDate: '2027-07-31',
     monthlyRent: 1200,
     securityDeposit: 1200,
-    status: 'active'
+    status: 'active',
+    tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+  },
+  {
+    id: 'lease-2',
+    propertyId: 'prop-3',
+    tenantId: 'tenant-1',
+    startDate: '2026-09-01',
+    endDate: '2027-08-31',
+    monthlyRent: 1100,
+    securityDeposit: 1100,
+    status: 'active',
+    tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
   }
 ];
 
@@ -125,6 +164,23 @@ let payments: Payment[] = [
     id: 'pay-3',
     leaseId: 'lease-1',
     amount: 1200,
+    dueDate: '2026-10-01',
+    status: 'Pending',
+    notes: 'October Rent'
+  },
+  {
+    id: 'pay-4',
+    leaseId: 'lease-2',
+    amount: 1100,
+    dueDate: '2026-09-01',
+    paymentDate: '2026-09-01',
+    status: 'Paid',
+    notes: 'September Rent'
+  },
+  {
+    id: 'pay-5',
+    leaseId: 'lease-2',
+    amount: 1100,
     dueDate: '2026-10-01',
     status: 'Pending',
     notes: 'October Rent'

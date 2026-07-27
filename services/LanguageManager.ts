@@ -66,7 +66,11 @@ export const translations: Record<string, Record<Language, string>> = {
   enter_desc: { en: "Enter announcement description...", vi: "Nhập nội dung thông báo..." },
   send: { en: "Send", vi: "Gửi" },
   urgent_notification: { en: "Urgent Notification", vi: "Thông Báo Khẩn" },
-  property_notice: { en: "Property Notice", vi: "Thông Báo Tòa Nhà" }
+  property_notice: { en: "Property Notice", vi: "Thông Báo Tòa Nhà" },
+  fire_tap_instruction: { en: "Tap the button below exactly 5 times to confirm and activate the fire alarm.", vi: "Nhấn nút bên dưới đúng 5 lần để xác nhận và kích hoạt báo động cháy." },
+  fire_tap_count: { en: "Taps: {count}/5", vi: "Số lần nhấn: {count}/5" },
+  fire_tap_warning: { en: "⚠️ ONLY USE IN ACTUAL EMERGENCY FIRE SITUATIONS", vi: "⚠️ CHỈ SỬ DỤNG KHI THỰC SỰ CÓ CHÁY KHẨN CẤP" },
+  fire_tap_activate: { en: "CONFIRMING...", vi: "ĐANG KÍCH HOẠT..." }
 };
 
 let globalLanguage: Language = 'en';

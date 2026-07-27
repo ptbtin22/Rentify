@@ -11,13 +11,16 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
+  Alert,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { Database } from '../../services/Database';
+import { NotificationManager } from '../../services/NotificationManager';
 
 export default function LandlordDashboard() {
   const router = useRouter();
@@ -33,6 +36,7 @@ export default function LandlordDashboard() {
   });
 
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [isReportVisible, setIsReportVisible] = useState(false);
 
   // Calculate Metrics from Database
   const calculateMetrics = () => {
@@ -79,7 +83,6 @@ export default function LandlordDashboard() {
   };
 
   useEffect(() => {
-    // Subscribe to DB updates
     const unsubscribe = Database.subscribe(calculateMetrics);
     calculateMetrics();
     return unsubscribe;
@@ -91,8 +94,35 @@ export default function LandlordDashboard() {
     return '#FF9500'; // Orange (Pending)
   };
 
+  // Quick Action: Remind Rent (Manual alert configuration triggers push notifications)
+  const handleRemindRent = async () => {
+    const properties = Database.getProperties();
+    const payments = Database.getPayments();
+    const leases = Database.getLeases();
+
+    const unpaidCount = payments.filter(p => p.status !== 'Paid').length;
+    if (unpaidCount === 0) {
+      Alert.alert(
+        local('announcements') || 'Reminders',
+        'All invoices are fully paid. No reminders needed!'
+      );
+      return;
+    }
+
+    // Trigger local push notification to simulate the reminders going out
+    await NotificationManager.triggerLocalNotification(
+      '⚡ Rent Reminder Dispatched',
+      `Sent rent reminders to ${unpaidCount} rooms with outstanding balances.`
+    );
+
+    Alert.alert(
+      'Reminders Dispatched',
+      `Rent invoice reminders successfully sent to ${unpaidCount} unpaid rooms via Push & Zalo.`
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Top Header View */}
       <View style={styles.header}>
         <View>
@@ -133,6 +163,39 @@ export default function LandlordDashboard() {
             <Text style={styles.metricIcon}>📄</Text>
             <Text style={styles.metricValue}>{metrics.activeLeasesCount}</Text>
             <Text style={styles.metricTitle}>Active Leases</Text>
+          </View>
+        </View>
+
+        {/* ─── Landlord Quick Actions Row ─── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsRow}>
+            {/* Create Lease action */}
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => router.push({ pathname: '/(landlord)/payments', params: { openNewLease: 'true' } })}
+            >
+              <View style={[styles.actionIconContainer, { backgroundColor: '#007AFF15' }]}>
+                <Text style={styles.actionIcon}>📝</Text>
+              </View>
+              <Text style={styles.actionLabel}>Tạo HĐ</Text>
+            </TouchableOpacity>
+
+            {/* Remind Rent action */}
+            <TouchableOpacity style={styles.actionItem} onPress={handleRemindRent}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#FF950015' }]}>
+                <Text style={styles.actionIcon}>🔔</Text>
+              </View>
+              <Text style={styles.actionLabel}>Nhắc Phí</Text>
+            </TouchableOpacity>
+
+            {/* Show Reports modal */}
+            <TouchableOpacity style={styles.actionItem} onPress={() => setIsReportVisible(true)}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#34C75915' }]}>
+                <Text style={styles.actionIcon}>📈</Text>
+              </View>
+              <Text style={styles.actionLabel}>Báo Cáo</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -194,6 +257,80 @@ export default function LandlordDashboard() {
           )}
         </View>
       </ScrollView>
+
+      {/* ─── Premium Revenue Report Modal ─── */}
+      <Modal visible={isReportVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setIsReportVisible(false)}>
+                <Text style={styles.modalCancel}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Revenue & Reports</Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <Text style={styles.modalSectionLabel}>Overview Analysis</Text>
+              
+              <View style={styles.reportSummaryCard}>
+                <View style={styles.reportRow}>
+                  <Text style={styles.reportLabel}>Collected Income (Paid):</Text>
+                  <Text style={[styles.reportValue, { color: '#34C759' }]}>
+                    ${metrics.totalRevenue.toLocaleString()}
+                  </Text>
+                </View>
+                <View style={styles.reportRow}>
+                  <Text style={styles.reportLabel}>Outstanding Invoices (Pending):</Text>
+                  <Text style={[styles.reportValue, { color: '#FF9500' }]}>
+                    ${metrics.unpaidBalance.toLocaleString()}
+                  </Text>
+                </View>
+                <View style={styles.reportRow}>
+                  <Text style={styles.reportLabel}>Total Projected Income:</Text>
+                  <Text style={[styles.reportValue, { fontWeight: '800' }]}>
+                    ${(metrics.totalRevenue + metrics.unpaidBalance).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.modalSectionLabel}>Monthly Projections</Text>
+              <View style={styles.chartMockContainer}>
+                <Text style={styles.chartTitle}>Average Rent Breakdown</Text>
+                <View style={styles.barItem}>
+                  <Text style={styles.barLabel}>Aug 2026</Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { width: '85%', backgroundColor: '#007AFF' }]} />
+                  </View>
+                  <Text style={styles.barPercent}>85%</Text>
+                </View>
+                <View style={styles.barItem}>
+                  <Text style={styles.barLabel}>Sep 2026</Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { width: '92%', backgroundColor: '#007AFF' }]} />
+                  </View>
+                  <Text style={styles.barPercent}>92%</Text>
+                </View>
+                <View style={styles.barItem}>
+                  <Text style={styles.barLabel}>Oct 2026</Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { width: '60%', backgroundColor: '#FF3B30' }]} />
+                  </View>
+                  <Text style={styles.barPercent}>60%</Text>
+                </View>
+              </View>
+
+              <Text style={styles.modalSectionLabel}>Performance Insights</Text>
+              <View style={styles.insightBox}>
+                <Text style={styles.insightText}>
+                  💡 Your occupancy rate is currently sitting at **{metrics.occupancyRate.toFixed(0)}%**. 
+                  Filling vacant rooms could boost monthly revenue by up to **$2,500**.
+                </Text>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -279,6 +416,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1C1C1E',
     marginBottom: 12
+  },
+  // ─── Actions Row Styles ───
+  actionsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    justifyContent: 'space-around',
+    marginBottom: 12
+  },
+  actionItem: {
+    alignItems: 'center',
+    width: 80
+  },
+  actionIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  actionIcon: {
+    fontSize: 22
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1C1E'
   },
   emptyChart: {
     height: 120,
@@ -386,5 +553,122 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 16,
     right: 16
+  },
+  // ─── Modal Styles ───
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    height: '85%',
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20
+  },
+  modalHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA'
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600'
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  modalScroll: {
+    padding: 16
+  },
+  modalSectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    marginTop: 16
+  },
+  reportSummaryCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12
+  },
+  reportRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  reportLabel: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    fontWeight: '500'
+  },
+  reportValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  chartMockContainer: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
+    gap: 14
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 4
+  },
+  barItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  barLabel: {
+    width: 70,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93'
+  },
+  barTrack: {
+    flex: 1,
+    height: 10,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 5,
+    overflow: 'hidden'
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 5
+  },
+  barPercent: {
+    width: 32,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    textAlign: 'right'
+  },
+  insightBox: {
+    backgroundColor: '#007AFF0D',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#007AFF1A'
+  },
+  insightText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18
   }
 });

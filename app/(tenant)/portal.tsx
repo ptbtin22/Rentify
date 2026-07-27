@@ -11,7 +11,12 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
+  ActionSheetIOS,
+  Platform,
+  Alert,
+  Linking,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,15 +30,26 @@ export default function TenantPortal() {
   const [activeLease, setActiveLease] = useState<Lease | null>(null);
   const [property, setProperty] = useState<Property | null>(null);
   const [tenantPayments, setTenantPayments] = useState<Payment[]>([]);
+  const [tenantLeases, setTenantLeases] = useState<Lease[]>([]);
+  
+  // Track currently selected lease context
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
+  const [isContractVisible, setIsContractVisible] = useState(false);
 
   const loadTenantData = () => {
     const leases = Database.getLeases();
     const properties = Database.getProperties();
     const payments = Database.getPayments();
 
-    // In a real app, we filter by the logged-in tenant's ID.
-    // For demo/mock purposes, we match the pre-populated 'lease-1' lease.
-    const lease = leases.find(l => l.status === 'active') || null;
+    // jane tenant represents tenant-1
+    const activeLeases = leases.filter(l => l.tenantId === 'tenant-1' && l.status === 'active');
+    setTenantLeases(activeLeases);
+
+    // Choose lease based on selectedLeaseId
+    let lease = activeLeases.find(l => l.id === selectedLeaseId) || null;
+    if (!lease && activeLeases.length > 0) {
+      lease = activeLeases[0];
+    }
     setActiveLease(lease);
 
     if (lease) {
@@ -52,7 +68,45 @@ export default function TenantPortal() {
     const unsubscribe = Database.subscribe(loadTenantData);
     loadTenantData();
     return unsubscribe;
-  }, []);
+  }, [selectedLeaseId]);
+
+  const handleSwitchRoom = () => {
+    const properties = Database.getProperties();
+    
+    // Get room names for action sheet buttons
+    const options = tenantLeases.map(l => {
+      const prop = properties.find(p => p.id === l.propertyId);
+      return prop ? prop.name : 'Unknown Room';
+    });
+
+    if (options.length <= 1) return;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', ...options],
+          cancelButtonIndex: 0,
+          title: 'Switch Active Rental Unit'
+        },
+        (buttonIndex) => {
+          if (buttonIndex > 0) {
+            const selectedLease = tenantLeases[buttonIndex - 1];
+            setSelectedLeaseId(selectedLease.id);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Switch Active Room',
+        'Choose a room context:',
+        options.map((name, idx) => ({
+          text: name,
+          onPress: () => setSelectedLeaseId(tenantLeases[idx].id)
+        })),
+        { cancelable: true }
+      );
+    }
+  };
 
   const getStatusColor = (status: string) => {
     if (status === 'Paid') return '#34C759'; // Green
@@ -61,12 +115,20 @@ export default function TenantPortal() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Top Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.welcomeText}>Welcome Back 👋</Text>
-          <Text style={styles.headerTitle}>Jane Tenant</Text>
+          {tenantLeases.length > 1 ? (
+            <TouchableOpacity onPress={handleSwitchRoom} style={styles.roomSwitcherBtn}>
+              <Text style={styles.headerTitle}>
+                Jane Tenant ({property ? property.name : 'Select Room'} ▾)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.headerTitle}>Jane Tenant</Text>
+          )}
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/login'); }}>
           <Text style={styles.logoutText}>Logout</Text>
@@ -121,6 +183,37 @@ export default function TenantPortal() {
           </View>
         </View>
 
+        {/* ─── Tenant Quick Actions & Links ─── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Links</Text>
+          <View style={styles.quickLinksRow}>
+            {/* View contract */}
+            <TouchableOpacity style={styles.linkCard} onPress={() => setIsContractVisible(true)}>
+              <Text style={styles.linkIcon}>📄</Text>
+              <Text style={styles.linkLabel}>Xem Hợp Đồng</Text>
+            </TouchableOpacity>
+
+            {/* Contact Landlord */}
+            <TouchableOpacity 
+              style={styles.linkCard} 
+              onPress={() => {
+                Alert.alert(
+                  'Liên Hệ Chủ Nhà',
+                  'Số điện thoại: 0901234567\nBạn muốn nhắn tin qua Zalo hay gọi điện trực tiếp?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Nhắn Zalo', onPress: () => Linking.openURL('https://zalo.me/0901234567') },
+                    { text: 'Gọi Điện', onPress: () => Linking.openURL('tel:0901234567') }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.linkIcon}>💬</Text>
+              <Text style={styles.linkLabel}>Liên Hệ Chủ Nhà</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Payments List Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Rent Payments</Text>
@@ -149,6 +242,40 @@ export default function TenantPortal() {
           )}
         </View>
       </ScrollView>
+      {/* ─── Contract Viewer Modal ─── */}
+      <Modal visible={isContractVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setIsContractVisible(false)}>
+                <Text style={styles.modalCancel}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Lease Contract Document</Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            <ScrollView style={styles.modalScroll} contentContainerStyle={{ alignItems: 'center' }}>
+              <Text style={styles.contractLabel}>Signed Lease Agreement</Text>
+              <View style={styles.documentMock}>
+                <Text style={styles.docHeader}>RENTAL AGREEMENT</Text>
+                <Text style={styles.docBody}>
+                  This Lease Agreement is entered into between Landlord and Resident Jane Tenant for rental unit: 
+                  {"\n\n"}{property ? property.name : 'Oakridge Apartment'}
+                  {"\n\n"}Terms:
+                  {"\n"}- Monthly rent: ${activeLease ? activeLease.monthlyRent : '1,200'}
+                  {"\n"}- Security deposit: ${activeLease ? activeLease.securityDeposit : '1,200'}
+                  {"\n"}- Duration: {activeLease ? activeLease.startDate : '2026-08-01'} to {activeLease ? activeLease.endDate : '2027-07-31'}
+                  {"\n\n"}Signed & Sealed under Rentify Security.
+                </Text>
+                <View style={styles.docSignatures}>
+                  <Text style={styles.signatureText}>Landlord: [Signed]</Text>
+                  <Text style={styles.signatureText}>Tenant: [Signed]</Text>
+                </View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -177,6 +304,119 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1C1C1E',
     marginTop: 2
+  },
+  roomSwitcherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  quickLinksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16
+  },
+  linkCard: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
+  },
+  linkIcon: {
+    fontSize: 28,
+    marginBottom: 8
+  },
+  linkLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  // Modal styles for document viewer
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    height: '80%',
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20
+  },
+  modalHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA'
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600'
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  modalScroll: {
+    padding: 20
+  },
+  contractLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    marginBottom: 16,
+    textAlign: 'center'
+  },
+  documentMock: {
+    width: '100%',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3
+  },
+  docHeader: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 20,
+    letterSpacing: 1
+  },
+  docBody: {
+    fontSize: 14,
+    color: '#2C2C2E',
+    lineHeight: 22,
+    fontWeight: '500'
+  },
+  docSignatures: {
+    marginTop: 36,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    paddingTop: 16
+  },
+  signatureText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    fontStyle: 'italic'
   },
   logoutButton: {
     paddingVertical: 6,

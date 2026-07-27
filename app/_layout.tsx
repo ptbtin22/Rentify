@@ -10,6 +10,7 @@ import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { NotificationManager } from '../services/NotificationManager';
+import { FireBroadcastOverlay } from '../components/FireBroadcastOverlay';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ presentation: 'modal' }} />
         <Stack.Screen name="login" />
       </Stack>
+      <FireBroadcastOverlay />
     </SafeAreaProvider>
   );
 }

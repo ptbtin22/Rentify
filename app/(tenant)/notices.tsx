@@ -21,6 +21,7 @@ import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { NotificationManager } from '../../services/NotificationManager';
+import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 
 export default function TenantNotices() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function TenantNotices() {
   const [showEmergencyBanner, setShowEmergencyBanner] = useState(false);
   const [emergencyText, setEmergencyText] = useState('');
   const bannerY = useState(new Animated.Value(-150))[0];
+  const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
 
   const themeColor = '#34C759'; // Green theme for tenant
 
@@ -78,29 +80,20 @@ export default function TenantNotices() {
   };
 
   const handleReportFire = () => {
-    Alert.alert(
-      local('confirm_fire_alert'),
-      local('fire_alert_desc'),
-      [
-        { text: local('cancel'), style: 'cancel' },
-        {
-          text: local('activate_alarm'),
-          style: 'destructive',
-          onPress: async () => {
-            await NoticeRepository.addNotice(
-              'fire',
-              local('emergency_fire_alert'),
-              local('fire_alert_message'),
-              'Tenant'
-            );
-            // Trigger native OS push notification banner
-            await NotificationManager.triggerLocalNotification(
-              '🔥 ' + local('emergency_fire_alert'),
-              local('fire_alert_message')
-            );
-          }
-        }
-      ]
+    setIsFireConfirmVisible(true);
+  };
+
+  const handleConfirmFire = async () => {
+    await NoticeRepository.addNotice(
+      'fire',
+      local('emergency_fire_alert'),
+      local('fire_alert_message'),
+      'Tenant'
+    );
+    // Trigger native OS push notification banner
+    await NotificationManager.triggerLocalNotification(
+      '🔥 ' + local('emergency_fire_alert'),
+      local('fire_alert_message')
     );
   };
 
@@ -116,7 +109,7 @@ export default function TenantNotices() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Sliding Emergency Warning Banner */}
       {showEmergencyBanner && (
         <Animated.View style={[styles.emergencyBanner, { transform: [{ translateY: bannerY }] }]}>
@@ -196,6 +189,12 @@ export default function TenantNotices() {
             </View>
           );
         }}
+      />
+
+      <FireConfirmationModal
+        visible={isFireConfirmVisible}
+        onClose={() => setIsFireConfirmVisible(false)}
+        onConfirm={handleConfirmFire}
       />
     </SafeAreaView>
   );

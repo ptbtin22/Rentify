@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
+import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 
 export default function LandlordNotices() {
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function LandlordNotices() {
   const [isComposeVisible, setIsComposeVisible] = useState(false);
   const [composeType, setComposeType] = useState<NoticeType>('info');
   const [composeBody, setComposeBody] = useState('');
+  const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
 
   const themeColor = '#007AFF'; // Blue theme for landlord
 
@@ -83,6 +85,15 @@ export default function LandlordNotices() {
   const handleSendNotice = async () => {
     if (!composeBody.trim()) return;
 
+    if (composeType === 'fire') {
+      setIsFireConfirmVisible(true);
+      return;
+    }
+
+    await submitNotice();
+  };
+
+  const submitNotice = async () => {
     const title =
       composeType === 'fire'
         ? local('emergency_fire_alert')
@@ -108,7 +119,7 @@ export default function LandlordNotices() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header View */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{local('announcements')}</Text>
@@ -237,6 +248,12 @@ export default function LandlordNotices() {
           </SafeAreaView>
         </View>
       </Modal>
+
+      <FireConfirmationModal
+        visible={isFireConfirmVisible}
+        onClose={() => setIsFireConfirmVisible(false)}
+        onConfirm={submitNotice}
+      />
     </SafeAreaView>
   );
 }

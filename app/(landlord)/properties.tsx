@@ -36,6 +36,9 @@ export default function LandlordProperties() {
   const [rentAmount, setRentAmount] = useState('1500');
   const [bedrooms, setBedrooms] = useState(2);
   const [bathrooms, setBathrooms] = useState(1.0);
+  const [electricityRate, setElectricityRate] = useState('3500');
+  const [waterRate, setWaterRate] = useState('100000');
+  const [serviceFee, setServiceFee] = useState('50000');
 
   const types: PropertyType[] = ['Apartment', 'House', 'Condo', 'Townhouse'];
 
@@ -60,7 +63,10 @@ export default function LandlordProperties() {
       propertyType,
       rentAmount: Number(rentAmount),
       bedrooms,
-      bathrooms
+      bathrooms,
+      electricityRate: Number(electricityRate),
+      waterRate: Number(waterRate),
+      serviceFee: Number(serviceFee)
     });
 
     // Reset Form
@@ -70,6 +76,9 @@ export default function LandlordProperties() {
     setRentAmount('1500');
     setBedrooms(2);
     setBathrooms(1.0);
+    setElectricityRate('3500');
+    setWaterRate('100000');
+    setServiceFee('50000');
     setIsAddVisible(false);
   };
 
@@ -105,7 +114,7 @@ export default function LandlordProperties() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Properties</Text>
@@ -233,6 +242,36 @@ export default function LandlordProperties() {
                 />
               </View>
 
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>Electricity (kWh)</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={electricityRate}
+                  onChangeText={setElectricityRate}
+                />
+              </View>
+
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>Water (Monthly)</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={waterRate}
+                  onChangeText={setWaterRate}
+                />
+              </View>
+
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>Service Fee</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={serviceFee}
+                  onChangeText={setServiceFee}
+                />
+              </View>
+
               {/* Bedroom Stepper */}
               <View style={styles.stepperRow}>
                 <Text style={styles.rowLabel}>Bedrooms: {bedrooms}</Text>
@@ -310,6 +349,18 @@ export default function LandlordProperties() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Bathrooms</Text>
                     <Text style={styles.detailValue}>{selectedProperty.bathrooms.toFixed(1)}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Electricity Rate</Text>
+                    <Text style={styles.detailValue}>${selectedProperty.electricityRate?.toLocaleString() || '3,500'}/kWh</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Water Rate</Text>
+                    <Text style={styles.detailValue}>${selectedProperty.waterRate?.toLocaleString() || '100,000'}/mo</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Service Fee</Text>
+                    <Text style={styles.detailValue}>${selectedProperty.serviceFee?.toLocaleString() || '50,000'}/mo</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status</Text>

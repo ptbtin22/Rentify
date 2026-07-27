@@ -18,11 +18,15 @@ import {
   ScrollView,
   Keyboard,
   KeyboardEvent,
+  LayoutAnimation,
+  UIManager,
+  Platform,
   Animated,
-  Platform
+  Vibration
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../../services/Database';
 
 // Helper: format Date → "YYYY-MM-DD" string for storage
@@ -37,7 +41,13 @@ const formatDate = (date: Date): string => {
 const formatLabel = (date: Date): string =>
   date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
+
 export default function LandlordPayments() {
+  const params = useLocalSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -49,6 +59,13 @@ export default function LandlordPayments() {
   // Modal visibility
   const [isAddLeaseVisible, setIsAddLeaseVisible] = useState(false);
 
+  // Auto-open modal if query parameter set
+  useEffect(() => {
+    if (params.openNewLease === 'true') {
+      setIsAddLeaseVisible(true);
+    }
+  }, [params.openNewLease]);
+
   // Form state — dates stored as Date objects
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
@@ -57,30 +74,57 @@ export default function LandlordPayments() {
   const [monthlyRent, setMonthlyRent] = useState('');
   const [securityDeposit, setSecurityDeposit] = useState('');
 
-  // Date picker inline state — which picker is open
-  type ActivePicker = 'start' | 'end' | null;
-  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+  // Camera mock states
+  const [tenantPhoto, setTenantPhoto] = useState<string | undefined>(undefined);
+  const [contractPhoto, setContractPhoto] = useState<string | undefined>(undefined);
+  const [isCameraVisible, setIsCameraVisible] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'tenant' | 'contract'>('tenant');
 
-  // Animation values for each picker (height 0→0 = collapsed, 1 = expanded)
+  // Each picker needs two independent booleans:
+  //   isMounted — controls whether the DateTimePicker is in the tree at all
+  //   isOpen    — drives the animation value (0 = closed, 1 = open)
+  // Opening:  mount first, then animate open.
+  // Closing:  animate to 0 first, unmount only inside the spring callback.
+  // This prevents the layout snap that occurs when the picker is removed from
+  // the tree before the height animation has fully settled at 0.
+
+  const [startMounted, setStartMounted] = useState(false);
+  const [endMounted,   setEndMounted]   = useState(false);
   const startPickerAnim = useRef(new Animated.Value(0)).current;
   const endPickerAnim   = useRef(new Animated.Value(0)).current;
 
   const PICKER_HEIGHT = 180;
 
-  const animatePicker = (anim: Animated.Value, open: boolean) => {
-    Animated.spring(anim, {
-      toValue: open ? 1 : 0,
-      useNativeDriver: false,
-      tension: 60,
-      friction: 10
-    }).start();
+  const openPicker  = (anim: Animated.Value) => {
+    Animated.spring(anim, { toValue: 1, useNativeDriver: false, tension: 60, friction: 10 }).start();
+  };
+  const closePicker = (anim: Animated.Value, unmount: () => void) => {
+    Animated.spring(anim, { toValue: 0, useNativeDriver: false, tension: 60, friction: 10 }).start(({ finished }) => {
+      if (finished) unmount();
+    });
   };
 
-  // Drive animations whenever activePicker changes
-  useEffect(() => {
-    animatePicker(startPickerAnim, activePicker === 'start');
-    animatePicker(endPickerAnim,   activePicker === 'end');
-  }, [activePicker]);
+  const toggleStartPicker = () => {
+    if (!startMounted) {
+      // Close end picker first if open
+      if (endMounted) closePicker(endPickerAnim, () => setEndMounted(false));
+      setStartMounted(true);
+      // Give React a frame to mount before animating
+      requestAnimationFrame(() => openPicker(startPickerAnim));
+    } else {
+      closePicker(startPickerAnim, () => setStartMounted(false));
+    }
+  };
+
+  const toggleEndPicker = () => {
+    if (!endMounted) {
+      if (startMounted) closePicker(startPickerAnim, () => setStartMounted(false));
+      setEndMounted(true);
+      requestAnimationFrame(() => openPicker(endPickerAnim));
+    } else {
+      closePicker(endPickerAnim, () => setEndMounted(false));
+    }
+  };
 
   // Exact keyboard height — updated by native keyboard events
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -129,7 +173,11 @@ export default function LandlordPayments() {
         else setEndDate(selected);
       }
       // On Android close picker immediately after selection
-      if (Platform.OS === 'android') setActivePicker(null);
+      if (Platform.OS === 'android') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        if (picker === 'start') setStartMounted(false);
+        else setEndMounted(false);
+      }
     };
 
   const handleCreateLease = () => {
@@ -141,7 +189,9 @@ export default function LandlordPayments() {
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       monthlyRent: Number(monthlyRent),
-      securityDeposit: Number(securityDeposit)
+      securityDeposit: Number(securityDeposit),
+      tenantPhoto,
+      contractPhoto
     });
 
     // Reset form
@@ -151,9 +201,16 @@ export default function LandlordPayments() {
     setEndDate(new Date('2027-07-31'));
     setMonthlyRent('');
     setSecurityDeposit('');
-    setActivePicker(null);
+    setTenantPhoto(undefined);
+    setContractPhoto(undefined);
+    closeAllPickers();
     setIsAddLeaseVisible(false);
     Alert.alert('Lease Agreement Saved', 'Lease has been activated. Invoices were generated.');
+  };
+
+  const closeAllPickers = () => {
+    closePicker(startPickerAnim, () => setStartMounted(false));
+    closePicker(endPickerAnim,   () => setEndMounted(false));
   };
 
   const handleRecordPaid = (id: string) => {
@@ -194,7 +251,7 @@ export default function LandlordPayments() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Payments & Leases</Text>
@@ -268,7 +325,7 @@ export default function LandlordPayments() {
           <SafeAreaView style={styles.modalContent}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => { setActivePicker(null); setIsAddLeaseVisible(false); }}>
+              <TouchableOpacity onPress={() => { closeAllPickers(); setIsAddLeaseVisible(false); }}>
                 <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>New Lease</Text>
@@ -332,28 +389,17 @@ export default function LandlordPayments() {
                 {/* Start Date row */}
                 <TouchableOpacity
                   style={styles.inputBoxRow}
-                  onPress={() => setActivePicker(activePicker === 'start' ? null : 'start')}
+                  onPress={toggleStartPicker}
                 >
                   <Text style={styles.rowLabel}>Start Date</Text>
                   <View style={styles.dateValueRow}>
                     <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
-                    <Text style={[styles.dateChevron, activePicker === 'start' && styles.dateChevronOpen]}>
-                      ›
-                    </Text>
+                    <Text style={[styles.dateChevron, startMounted && styles.dateChevronOpen]}>›</Text>
                   </View>
                 </TouchableOpacity>
 
-                {/* Animated start date picker */}
-                <Animated.View style={[
-                  styles.pickerWrapper,
-                  {
-                    height: startPickerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, PICKER_HEIGHT]
-                    }),
-                    opacity: startPickerAnim
-                  }
-                ]}>
+                {/* Start picker — always mounted, height driven by LayoutAnimation */}
+                <View style={[styles.pickerWrapper, { height: startMounted ? PICKER_HEIGHT : 0 }]}>
                   <DateTimePicker
                     value={startDate}
                     mode="date"
@@ -361,33 +407,22 @@ export default function LandlordPayments() {
                     onChange={onDateChange('start')}
                     style={{ flex: 1 }}
                   />
-                </Animated.View>
+                </View>
 
                 {/* End Date row */}
                 <TouchableOpacity
                   style={styles.inputBoxRow}
-                  onPress={() => setActivePicker(activePicker === 'end' ? null : 'end')}
+                  onPress={toggleEndPicker}
                 >
                   <Text style={styles.rowLabel}>End Date</Text>
                   <View style={styles.dateValueRow}>
                     <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
-                    <Text style={[styles.dateChevron, activePicker === 'end' && styles.dateChevronOpen]}>
-                      ›
-                    </Text>
+                    <Text style={[styles.dateChevron, endMounted && styles.dateChevronOpen]}>›</Text>
                   </View>
                 </TouchableOpacity>
 
-                {/* Animated end date picker */}
-                <Animated.View style={[
-                  styles.pickerWrapper,
-                  {
-                    height: endPickerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, PICKER_HEIGHT]
-                    }),
-                    opacity: endPickerAnim
-                  }
-                ]}>
+                {/* End picker — always mounted, height driven by LayoutAnimation */}
+                <View style={[styles.pickerWrapper, { height: endMounted ? PICKER_HEIGHT : 0 }]}>
                   <DateTimePicker
                     value={endDate}
                     mode="date"
@@ -396,7 +431,7 @@ export default function LandlordPayments() {
                     onChange={onDateChange('end')}
                     style={{ flex: 1 }}
                   />
-                </Animated.View>
+                </View>
 
                 {/* Monthly Rent */}
                 <View style={styles.inputBoxRow}>
@@ -422,9 +457,92 @@ export default function LandlordPayments() {
                   />
                 </View>
 
+                {/* ── Tenant & Contract Photos ── */}
+                <Text style={styles.label}>Attachments & Photos</Text>
+                
+                <View style={styles.photoRow}>
+                  <View style={styles.photoInfo}>
+                    <Text style={styles.rowLabel}>Tenant Photo</Text>
+                    <Text style={styles.photoStatus}>
+                      {tenantPhoto ? '✅ Captured' : '❌ Missing'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.photoCaptureBtn}
+                    onPress={() => {
+                      setCameraMode('tenant');
+                      setIsCameraVisible(true);
+                    }}
+                  >
+                    <Text style={styles.photoCaptureText}>Capture</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.photoRow}>
+                  <View style={styles.photoInfo}>
+                    <Text style={styles.rowLabel}>Signed Contract</Text>
+                    <Text style={styles.photoStatus}>
+                      {contractPhoto ? '✅ Captured' : '❌ Missing'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.photoCaptureBtn}
+                    onPress={() => {
+                      setCameraMode('contract');
+                      setIsCameraVisible(true);
+                    }}
+                  >
+                    <Text style={styles.photoCaptureText}>Capture</Text>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Bottom spacer — already handled by paddingBottom on contentContainerStyle */}
               </ScrollView>
           </SafeAreaView>
+
+          {/* ── Simulated Camera Viewfinder Modal (Nested to render on top on iOS) ── */}
+          <Modal visible={isCameraVisible} animationType="slide" transparent>
+            <SafeAreaView style={styles.cameraOverlay}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity onPress={() => setIsCameraVisible(false)}>
+                  <Text style={styles.cameraCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.cameraTitle}>
+                  {cameraMode === 'tenant' ? 'Capture Tenant Photo' : 'Capture Contract Document'}
+                </Text>
+                <View style={{ width: 50 }} />
+              </View>
+
+              {/* Viewfinder simulation */}
+              <View style={styles.viewfinder}>
+                <View style={styles.scanTarget} />
+                <Text style={styles.cameraInstructions}>
+                  {cameraMode === 'tenant' ? 'Align tenant face inside the target frame' : 'Align contract sheet inside the target frame'}
+                </Text>
+              </View>
+
+              {/* Camera controls */}
+              <View style={styles.cameraControls}>
+                <TouchableOpacity
+                  style={styles.shutterButton}
+                  onPress={() => {
+                    const mockUrl = cameraMode === 'tenant' 
+                      ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' 
+                      : 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300';
+                    
+                    if (cameraMode === 'tenant') setTenantPhoto(mockUrl);
+                    else setContractPhoto(mockUrl);
+
+                    Vibration.vibrate(100);
+                    Alert.alert('Photo Captured', 'Document snapshot has been attached to this lease agreement.');
+                    setIsCameraVisible(false);
+                  }}
+                >
+                  <View style={styles.shutterInner} />
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Modal>
         </View>
       </Modal>
     </SafeAreaView>
@@ -599,7 +717,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     borderRadius: 14,
     padding: 12,
-    marginBottom: 12
+    marginBottom: 12,
+    alignItems: 'center'
   },
   pickerTitle: {
     fontSize: 12,
@@ -667,7 +786,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#F2F2F7',
     borderRadius: 12,
-    marginBottom: 12
+    marginBottom: 12,
+    alignItems: 'center'
   },
   textInputRight: {
     fontSize: 15,
@@ -675,5 +795,107 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     width: 120,
     textAlign: 'right'
+  },
+  photoRow: {
+    flexDirection: 'row',
+    height: 54,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  photoInfo: {
+    justifyContent: 'center'
+  },
+  photoStatus: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600',
+    marginTop: 2
+  },
+  photoCaptureBtn: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8
+  },
+  photoCaptureText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  // Camera Modal Styles
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: '#000'
+  },
+  cameraHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2E'
+  },
+  cameraCancel: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  cameraTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  viewfinder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    marginHorizontal: 16,
+    marginTop: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative'
+  },
+  scanTarget: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#34C759',
+    borderRadius: 16,
+    borderStyle: 'dashed'
+  },
+  cameraInstructions: {
+    position: 'absolute',
+    bottom: 24,
+    color: '#AEAEB2',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 32
+  },
+  cameraControls: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  shutterButton: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    borderColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  shutterInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFF'
   }
 });

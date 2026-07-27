@@ -15,7 +15,8 @@ import {
   Modal,
   TextInput,
   Alert,
-  ScrollView
+  ScrollView,
+  Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease } from '../../services/Database';
@@ -97,7 +98,7 @@ export default function LandlordTenants() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tenants</Text>
@@ -254,6 +255,18 @@ export default function LandlordTenants() {
                     <Text style={styles.detailLabel}>Phone</Text>
                     <Text style={styles.detailValue}>{selectedTenant.phone || 'N/A'}</Text>
                   </View>
+                  {selectedTenant.phone ? (
+                    <TouchableOpacity
+                      style={styles.zaloBtn}
+                      onPress={() => {
+                        const cleanPhone = selectedTenant.phone.replace(/[^0-9]/g, '');
+                        // Strip leading +84 or 0 if desired, but zalo.me works best with raw local digits or +84
+                        Linking.openURL(`https://zalo.me/${cleanPhone}`);
+                      }}
+                    >
+                      <Text style={styles.zaloBtnText}>💬 Chat on Zalo / Liên hệ Zalo</Text>
+                    </TouchableOpacity>
+                  ) : null}
                   {selectedTenant.notes ? (
                     <View style={styles.notesDetails}>
                       <Text style={styles.notesTitle}>Notes</Text>
@@ -541,6 +554,21 @@ const styles = StyleSheet.create({
   deleteBtnText: {
     color: '#FF3B30',
     fontSize: 15,
+    fontWeight: '700'
+  },
+  zaloBtn: {
+    height: 48,
+    backgroundColor: '#007AFF1A',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#007AFF4D'
+  },
+  zaloBtnText: {
+    color: '#007AFF',
+    fontSize: 14,
     fontWeight: '700'
   }
 });
