@@ -5,7 +5,7 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -16,7 +16,8 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  KeyboardAvoidingView,
+  Keyboard,
+  KeyboardEvent,
   Platform
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -58,6 +59,22 @@ export default function LandlordPayments() {
   // Date picker inline state — which picker is open
   type ActivePicker = 'start' | 'end' | null;
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+
+  // Exact keyboard height — updated by native keyboard events
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const formScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const refreshData = () => {
     setPayments([...Database.getPayments()]);
@@ -242,14 +259,11 @@ export default function LandlordPayments() {
               </TouchableOpacity>
             </View>
 
-            {/* KeyboardAvoidingView wraps the scrollable form */}
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={0}
-            >
+            {/* Form — ScrollView with exact keyboard padding */}
               <ScrollView
+                ref={formScrollRef}
                 style={styles.formScroll}
+                contentContainerStyle={{ paddingBottom: keyboardHeight + 32 }}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
@@ -357,10 +371,8 @@ export default function LandlordPayments() {
                   />
                 </View>
 
-                {/* Bottom padding so the last field isn't hidden by keyboard */}
-                <View style={{ height: 80 }} />
+                {/* Bottom spacer — already handled by paddingBottom on contentContainerStyle */}
               </ScrollView>
-            </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
       </Modal>
