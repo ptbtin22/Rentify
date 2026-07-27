@@ -15,10 +15,25 @@ import {
   Modal,
   TextInput,
   Alert,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../../services/Database';
+
+// Helper: format Date → "YYYY-MM-DD" string for storage
+const formatDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// Helper: format Date → "Aug 1, 2026" readable label
+const formatLabel = (date: Date): string =>
+  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function LandlordPayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -29,16 +44,20 @@ export default function LandlordPayments() {
   // Filtering
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<PaymentStatus | 'All'>('All');
 
-  // Modals
+  // Modal visibility
   const [isAddLeaseVisible, setIsAddLeaseVisible] = useState(false);
 
-  // Form Fields for New Lease
+  // Form state — dates stored as Date objects
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
-  const [startDate, setStartDate] = useState('2026-08-01');
-  const [endDate, setEndDate] = useState('2027-07-31');
+  const [startDate, setStartDate] = useState(new Date('2026-08-01'));
+  const [endDate, setEndDate] = useState(new Date('2027-07-31'));
   const [monthlyRent, setMonthlyRent] = useState('');
   const [securityDeposit, setSecurityDeposit] = useState('');
+
+  // Date picker inline state — which picker is open
+  type ActivePicker = 'start' | 'end' | null;
+  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
   const refreshData = () => {
     setPayments([...Database.getPayments()]);
@@ -53,7 +72,7 @@ export default function LandlordPayments() {
     return unsubscribe;
   }, []);
 
-  // Update default rent when property is picked
+  // Auto-fill rent from property
   useEffect(() => {
     if (selectedPropertyId) {
       const prop = properties.find(p => p.id === selectedPropertyId);
@@ -64,25 +83,36 @@ export default function LandlordPayments() {
     }
   }, [selectedPropertyId]);
 
+  const onDateChange = (picker: 'start' | 'end') =>
+    (_event: DateTimePickerEvent, selected?: Date) => {
+      if (selected) {
+        if (picker === 'start') setStartDate(selected);
+        else setEndDate(selected);
+      }
+      // On Android close picker immediately after selection
+      if (Platform.OS === 'android') setActivePicker(null);
+    };
+
   const handleCreateLease = () => {
-    if (!selectedPropertyId || !selectedTenantId || !startDate || !endDate) return;
+    if (!selectedPropertyId || !selectedTenantId) return;
 
     Database.createLease({
       propertyId: selectedPropertyId,
       tenantId: selectedTenantId,
-      startDate,
-      endDate,
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
       monthlyRent: Number(monthlyRent),
       securityDeposit: Number(securityDeposit)
     });
 
-    // Reset Form
+    // Reset form
     setSelectedPropertyId('');
     setSelectedTenantId('');
-    setStartDate('2026-08-01');
-    setEndDate('2027-07-31');
+    setStartDate(new Date('2026-08-01'));
+    setEndDate(new Date('2027-07-31'));
     setMonthlyRent('');
     setSecurityDeposit('');
+    setActivePicker(null);
     setIsAddLeaseVisible(false);
     Alert.alert('Lease Agreement Saved', 'Lease has been activated. Invoices were generated.');
   };
@@ -93,22 +123,15 @@ export default function LandlordPayments() {
       'Record this payment as received?',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Record Paid',
-          onPress: () => {
-            Database.recordPaymentReceived(id);
-          }
-        }
+        { text: 'Record Paid', onPress: () => { Database.recordPaymentReceived(id); } }
       ]
     );
   };
 
-  // Compile layout item view bindings
   const getPaymentDisplayData = (pay: Payment) => {
     const lease = leases.find(l => l.id === pay.leaseId);
     const prop = lease ? properties.find(p => p.id === lease.propertyId) : null;
     const tenant = lease ? tenants.find(t => t.id === lease.tenantId) : null;
-
     return {
       propertyName: prop ? prop.name : 'Unknown Property',
       tenantName: tenant ? tenant.name : 'Unknown Tenant',
@@ -125,12 +148,9 @@ export default function LandlordPayments() {
 
   const getStatusStyles = (status: PaymentStatus) => {
     switch (status) {
-      case 'Paid':
-        return { bg: '#34C75926', text: '#34C759' };
-      case 'Overdue':
-        return { bg: '#FF3B3026', text: '#FF3B30' };
-      default:
-        return { bg: '#007AFF26', text: '#007AFF' };
+      case 'Paid':    return { bg: '#34C75926', text: '#34C759' };
+      case 'Overdue': return { bg: '#FF3B3026', text: '#FF3B30' };
+      default:        return { bg: '#007AFF26', text: '#007AFF' };
     }
   };
 
@@ -144,15 +164,12 @@ export default function LandlordPayments() {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Options */}
+      {/* Filter Tabs */}
       <View style={styles.filterRow}>
         {(['All', 'Paid', 'Pending', 'Overdue'] as const).map(f => (
           <TouchableOpacity
             key={f}
-            style={[
-              styles.filterTab,
-              selectedStatusFilter === f && styles.filterTabActive
-            ]}
+            style={[styles.filterTab, selectedStatusFilter === f && styles.filterTabActive]}
             onPress={() => setSelectedStatusFilter(f)}
           >
             <Text style={[styles.filterTabText, selectedStatusFilter === f && styles.filterTabTextActive]}>
@@ -184,7 +201,6 @@ export default function LandlordPayments() {
                 <Text style={styles.tenantName}>Tenant: {info.tenantName}</Text>
                 <Text style={styles.dueDate}>Due: {info.dueDate}</Text>
               </View>
-
               <View style={styles.values}>
                 <Text style={styles.amount}>${info.amount.toLocaleString()}</Text>
                 {item.status !== 'Paid' ? (
@@ -207,111 +223,144 @@ export default function LandlordPayments() {
         }}
       />
 
-      {/* New Lease Modal */}
+      {/* ─── New Lease Modal ─── */}
       <Modal visible={isAddLeaseVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <SafeAreaView style={styles.modalContent}>
+            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setIsAddLeaseVisible(false)}>
+              <TouchableOpacity onPress={() => { setActivePicker(null); setIsAddLeaseVisible(false); }}>
                 <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>New Lease</Text>
               <TouchableOpacity
                 onPress={handleCreateLease}
                 disabled={!selectedPropertyId || !selectedTenantId}
-                style={(!selectedPropertyId || !selectedTenantId) && { opacity: 0.5 }}
+                style={(!selectedPropertyId || !selectedTenantId) && { opacity: 0.4 }}
               >
                 <Text style={styles.modalSave}>Save</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.formScroll}>
-              <Text style={styles.label}>Property & Tenant</Text>
+            {/* KeyboardAvoidingView wraps the scrollable form */}
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={0}
+            >
+              <ScrollView
+                style={styles.formScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {/* ── Property & Tenant ── */}
+                <Text style={styles.label}>Property & Tenant</Text>
 
-              {/* Property Selector */}
-              <View style={styles.pickerBox}>
-                <Text style={styles.pickerTitle}>Select Property:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
-                  {properties.map(p => (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[
-                        styles.selectItem,
-                        selectedPropertyId === p.id && styles.selectItemActive
-                      ]}
-                      onPress={() => setSelectedPropertyId(p.id)}
-                    >
-                      <Text style={[styles.selectText, selectedPropertyId === p.id && styles.selectTextActive]}>
-                        {p.name} ({p.isOccupied ? 'Occupied' : 'Vacant'})
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+                <View style={styles.pickerBox}>
+                  <Text style={styles.pickerTitle}>Select Property:</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
+                    {properties.map(p => (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={[styles.selectItem, selectedPropertyId === p.id && styles.selectItemActive]}
+                        onPress={() => setSelectedPropertyId(p.id)}
+                      >
+                        <Text style={[styles.selectText, selectedPropertyId === p.id && styles.selectTextActive]}>
+                          {p.name} ({p.isOccupied ? 'Occupied' : 'Vacant'})
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
 
-              {/* Tenant Selector */}
-              <View style={styles.pickerBox}>
-                <Text style={styles.pickerTitle}>Select Tenant:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
-                  {tenants.map(t => (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[
-                        styles.selectItem,
-                        selectedTenantId === t.id && styles.selectItemActive
-                      ]}
-                      onPress={() => setSelectedTenantId(t.id)}
-                    >
-                      <Text style={[styles.selectText, selectedTenantId === t.id && styles.selectTextActive]}>
-                        {t.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+                <View style={styles.pickerBox}>
+                  <Text style={styles.pickerTitle}>Select Tenant:</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
+                    {tenants.map(t => (
+                      <TouchableOpacity
+                        key={t.id}
+                        style={[styles.selectItem, selectedTenantId === t.id && styles.selectItemActive]}
+                        onPress={() => setSelectedTenantId(t.id)}
+                      >
+                        <Text style={[styles.selectText, selectedTenantId === t.id && styles.selectTextActive]}>
+                          {t.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
 
-              <Text style={styles.label}>Lease Terms</Text>
+                {/* ── Lease Terms ── */}
+                <Text style={styles.label}>Lease Terms</Text>
 
-              <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Start Date</Text>
-                <TextInput
-                  style={styles.textInputRight}
-                  placeholder="YYYY-MM-DD"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                />
-              </View>
+                {/* Start Date row */}
+                <TouchableOpacity
+                  style={styles.inputBoxRow}
+                  onPress={() => setActivePicker(activePicker === 'start' ? null : 'start')}
+                >
+                  <Text style={styles.rowLabel}>Start Date</Text>
+                  <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
+                </TouchableOpacity>
 
-              <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>End Date</Text>
-                <TextInput
-                  style={styles.textInputRight}
-                  placeholder="YYYY-MM-DD"
-                  value={endDate}
-                  onChangeText={setEndDate}
-                />
-              </View>
+                {/* Inline start date picker (iOS always-visible, Android opens picker) */}
+                {activePicker === 'start' && (
+                  <DateTimePicker
+                    value={startDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange('start')}
+                    style={styles.datePicker}
+                  />
+                )}
 
-              <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Monthly Rent ($)</Text>
-                <TextInput
-                  style={styles.textInputRight}
-                  keyboardType="numeric"
-                  value={monthlyRent}
-                  onChangeText={setMonthlyRent}
-                />
-              </View>
+                {/* End Date row */}
+                <TouchableOpacity
+                  style={styles.inputBoxRow}
+                  onPress={() => setActivePicker(activePicker === 'end' ? null : 'end')}
+                >
+                  <Text style={styles.rowLabel}>End Date</Text>
+                  <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
+                </TouchableOpacity>
 
-              <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Security Deposit ($)</Text>
-                <TextInput
-                  style={styles.textInputRight}
-                  keyboardType="numeric"
-                  value={securityDeposit}
-                  onChangeText={setSecurityDeposit}
-                />
-              </View>
-            </ScrollView>
+                {activePicker === 'end' && (
+                  <DateTimePicker
+                    value={endDate}
+                    mode="date"
+                    minimumDate={startDate}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange('end')}
+                    style={styles.datePicker}
+                  />
+                )}
+
+                {/* Monthly Rent */}
+                <View style={styles.inputBoxRow}>
+                  <Text style={styles.rowLabel}>Monthly Rent ($)</Text>
+                  <TextInput
+                    style={styles.textInputRight}
+                    keyboardType="numeric"
+                    value={monthlyRent}
+                    onChangeText={setMonthlyRent}
+                    returnKeyType="next"
+                  />
+                </View>
+
+                {/* Security Deposit */}
+                <View style={styles.inputBoxRow}>
+                  <Text style={styles.rowLabel}>Security Deposit ($)</Text>
+                  <TextInput
+                    style={styles.textInputRight}
+                    keyboardType="numeric"
+                    value={securityDeposit}
+                    onChangeText={setSecurityDeposit}
+                    returnKeyType="done"
+                  />
+                </View>
+
+                {/* Bottom padding so the last field isn't hidden by keyboard */}
+                <View style={{ height: 80 }} />
+              </ScrollView>
+            </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
       </Modal>
@@ -436,13 +485,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800'
   },
+  // ─── Modal ───
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end'
   },
   modalContent: {
-    height: '90%',
+    height: '92%',
     backgroundColor: '#FFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20
@@ -517,10 +567,10 @@ const styles = StyleSheet.create({
   },
   inputBoxRow: {
     flexDirection: 'row',
-    height: 48,
+    minHeight: 48,
     backgroundColor: '#F2F2F7',
     borderRadius: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12
@@ -529,6 +579,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1C1C1E'
+  },
+  dateValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF'
+  },
+  datePicker: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    marginBottom: 12,
+    height: 160
   },
   textInputRight: {
     fontSize: 15,
