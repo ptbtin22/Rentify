@@ -18,6 +18,7 @@ import {
   ScrollView,
   Keyboard,
   KeyboardEvent,
+  Animated,
   Platform
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -59,6 +60,27 @@ export default function LandlordPayments() {
   // Date picker inline state — which picker is open
   type ActivePicker = 'start' | 'end' | null;
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
+
+  // Animation values for each picker (height 0→0 = collapsed, 1 = expanded)
+  const startPickerAnim = useRef(new Animated.Value(0)).current;
+  const endPickerAnim   = useRef(new Animated.Value(0)).current;
+
+  const PICKER_HEIGHT = 180;
+
+  const animatePicker = (anim: Animated.Value, open: boolean) => {
+    Animated.spring(anim, {
+      toValue: open ? 1 : 0,
+      useNativeDriver: false,
+      tension: 60,
+      friction: 10
+    }).start();
+  };
+
+  // Drive animations whenever activePicker changes
+  useEffect(() => {
+    animatePicker(startPickerAnim, activePicker === 'start');
+    animatePicker(endPickerAnim,   activePicker === 'end');
+  }, [activePicker]);
 
   // Exact keyboard height — updated by native keyboard events
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -313,19 +335,33 @@ export default function LandlordPayments() {
                   onPress={() => setActivePicker(activePicker === 'start' ? null : 'start')}
                 >
                   <Text style={styles.rowLabel}>Start Date</Text>
-                  <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
+                  <View style={styles.dateValueRow}>
+                    <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
+                    <Text style={[styles.dateChevron, activePicker === 'start' && styles.dateChevronOpen]}>
+                      ›
+                    </Text>
+                  </View>
                 </TouchableOpacity>
 
-                {/* Inline start date picker (iOS always-visible, Android opens picker) */}
-                {activePicker === 'start' && (
+                {/* Animated start date picker */}
+                <Animated.View style={[
+                  styles.pickerWrapper,
+                  {
+                    height: startPickerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, PICKER_HEIGHT]
+                    }),
+                    opacity: startPickerAnim
+                  }
+                ]}>
                   <DateTimePicker
                     value={startDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={onDateChange('start')}
-                    style={styles.datePicker}
+                    style={{ flex: 1 }}
                   />
-                )}
+                </Animated.View>
 
                 {/* End Date row */}
                 <TouchableOpacity
@@ -333,19 +369,34 @@ export default function LandlordPayments() {
                   onPress={() => setActivePicker(activePicker === 'end' ? null : 'end')}
                 >
                   <Text style={styles.rowLabel}>End Date</Text>
-                  <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
+                  <View style={styles.dateValueRow}>
+                    <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
+                    <Text style={[styles.dateChevron, activePicker === 'end' && styles.dateChevronOpen]}>
+                      ›
+                    </Text>
+                  </View>
                 </TouchableOpacity>
 
-                {activePicker === 'end' && (
+                {/* Animated end date picker */}
+                <Animated.View style={[
+                  styles.pickerWrapper,
+                  {
+                    height: endPickerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, PICKER_HEIGHT]
+                    }),
+                    opacity: endPickerAnim
+                  }
+                ]}>
                   <DateTimePicker
                     value={endDate}
                     mode="date"
                     minimumDate={startDate}
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={onDateChange('end')}
-                    style={styles.datePicker}
+                    style={{ flex: 1 }}
                   />
-                )}
+                </Animated.View>
 
                 {/* Monthly Rent */}
                 <View style={styles.inputBoxRow}>
@@ -597,11 +648,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF'
   },
-  datePicker: {
+  dateValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  dateChevron: {
+    fontSize: 20,
+    color: '#007AFF',
+    fontWeight: '300',
+    transform: [{ rotate: '90deg' }]
+  },
+  dateChevronOpen: {
+    transform: [{ rotate: '-90deg' }]
+  },
+  // Wrapper that animates height — must clip children while collapsing
+  pickerWrapper: {
+    overflow: 'hidden',
     backgroundColor: '#F2F2F7',
     borderRadius: 12,
-    marginBottom: 12,
-    height: 160
+    marginBottom: 12
   },
   textInputRight: {
     fontSize: 15,
