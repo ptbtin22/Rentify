@@ -15,6 +15,8 @@ import {
   Modal,
   TextInput,
   Alert,
+  ActionSheetIOS,
+  Platform,
   Animated,
   ScrollView
 } from 'react-native';
@@ -52,20 +54,30 @@ export default function LandlordNotices() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    Alert.alert(
-      local('delete'),
-      local('delete_confirm_desc'),
-      [
-        { text: local('cancel'), style: 'cancel' },
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: local('delete'),
-          style: 'destructive',
-          onPress: async () => {
+          title: local('delete_confirm_desc'),
+          options: [local('cancel'), local('delete')],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 1) {
             await NoticeRepository.deleteNotice(id);
           }
         }
-      ]
-    );
+      );
+    } else {
+      Alert.alert(
+        local('delete'),
+        local('delete_confirm_desc'),
+        [
+          { text: local('cancel'), style: 'cancel' },
+          { text: local('delete'), style: 'destructive', onPress: async () => { await NoticeRepository.deleteNotice(id); } }
+        ]
+      );
+    }
   };
 
   const handleSendNotice = async () => {
@@ -203,7 +215,7 @@ export default function LandlordNotices() {
                         composeType === t && { color: '#FFF', fontWeight: '700' }
                       ]}
                     >
-                      {t === 'info' ? '📢' : t === 'urgent' ? '⚡' : '🔥'}
+                      {t === 'info' ? `📢 ${local('normal_level')}` : t === 'urgent' ? `⚡ ${local('urgent_level')}` : `🔥 ${local('fire_level')}`}
                     </Text>
                   </TouchableOpacity>
                 ))}

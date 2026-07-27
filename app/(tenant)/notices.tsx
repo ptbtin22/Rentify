@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
+import { NotificationManager } from '../../services/NotificationManager';
 
 export default function TenantNotices() {
   const router = useRouter();
@@ -91,6 +92,11 @@ export default function TenantNotices() {
               local('emergency_fire_alert'),
               local('fire_alert_message'),
               'Tenant'
+            );
+            // Trigger native OS push notification banner
+            await NotificationManager.triggerLocalNotification(
+              '🔥 ' + local('emergency_fire_alert'),
+              local('fire_alert_message')
             );
           }
         }

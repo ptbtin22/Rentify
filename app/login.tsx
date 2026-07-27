@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, Role } from '../services/AuthManager';
 import { useLanguage } from '../services/LanguageManager';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Login() {
   const router = useRouter();
@@ -127,9 +128,14 @@ export default function Login() {
           >
             {/* Logo Section */}
             <View style={styles.logoSection}>
-              <View style={[styles.logo, { backgroundColor: themeColor }]}>
+              <LinearGradient
+                colors={logoGradient as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.logo}
+              >
                 <Text style={styles.logoLetter}>R</Text>
-              </View>
+              </LinearGradient>
               <Text style={styles.logoText}>Rentify</Text>
               <Text style={styles.logoSubtitle}>{local('subtitle')}</Text>
             </View>
