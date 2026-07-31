@@ -9,8 +9,15 @@ export type PropertyType = 'Apartment' | 'House' | 'Condo' | 'Townhouse';
 export type LeaseStatus = 'active' | 'pending' | 'terminated';
 export type PaymentStatus = 'Paid' | 'Pending' | 'Overdue';
 
+export interface KhuTro {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export interface Property {
   id: string;
+  khuTroId: string; // Parent building complex
   name: string;
   address: string;
   propertyType: PropertyType;
@@ -55,10 +62,16 @@ export interface Payment {
 }
 
 // Initial Mock Data with full breakdown configurations
+let khuTros: KhuTro[] = [
+  { id: 'khu-1', name: 'Oakridge Apartment', address: '456 Greenway Blvd' },
+  { id: 'khu-2', name: 'Greenway House', address: '128 Pinecrest Ave' }
+];
+
 let properties: Property[] = [
   {
     id: 'prop-1',
-    name: 'Oakridge Apt 4B',
+    khuTroId: 'khu-1',
+    name: 'Phòng 202',
     address: '456 Greenway Blvd, Room 202',
     propertyType: 'Apartment',
     rentAmount: 1200,
@@ -71,7 +84,8 @@ let properties: Property[] = [
   },
   {
     id: 'prop-2',
-    name: 'Greenway House',
+    khuTroId: 'khu-2',
+    name: 'Căn A',
     address: '128 Pinecrest Ave',
     propertyType: 'House',
     rentAmount: 2500,
@@ -84,7 +98,8 @@ let properties: Property[] = [
   },
   {
     id: 'prop-3',
-    name: 'Oakridge Apt 2A',
+    khuTroId: 'khu-1',
+    name: 'Phòng 104',
     address: '456 Greenway Blvd, Room 104',
     propertyType: 'Apartment',
     rentAmount: 1100,
@@ -292,6 +307,44 @@ export const Database = {
         ? { ...p, status: 'Paid' as const, paymentDate: new Date().toISOString().split('T')[0] }
         : p
     );
+    notify();
+  },
+
+  updatePaymentAmountAndStatus: (paymentId: string, amount: number, status: 'Paid' | 'Pending') => {
+    payments = payments.map(p =>
+      p.id === paymentId
+        ? {
+            ...p,
+            amount,
+            status,
+            paymentDate: status === 'Paid' ? new Date().toISOString().split('T')[0] : p.paymentDate
+          }
+        : p
+    );
+    notify();
+  },
+
+  // KhuTro Actions
+  getKhuTros: () => {
+    return khuTros;
+  },
+
+  addKhuTro: (name: string, address: string) => {
+    const newKhu: KhuTro = {
+      id: 'khu-' + Math.random().toString(36).substring(7),
+      name,
+      address
+    };
+    khuTros.push(newKhu);
+    notify();
+    return newKhu;
+  },
+
+  deleteKhuTro: (id: string) => {
+    khuTros = khuTros.filter(k => k.id !== id);
+    // Delete linked properties
+    const linkedProps = properties.filter(p => p.khuTroId === id);
+    linkedProps.forEach(p => Database.deleteProperty(p.id));
     notify();
   }
 };

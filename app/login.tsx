@@ -17,11 +17,14 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Image,
+  Alert
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth, Role } from '../services/AuthManager';
+import { useAuth, Role, AuthManager } from '../services/AuthManager';
 import { useLanguage } from '../services/LanguageManager';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -29,9 +32,79 @@ export default function Login() {
   const router = useRouter();
   const { login } = useAuth();
   const { local, language, setLanguage } = useLanguage();
+  const insets = useSafeAreaInsets();
 
   // Form State
   const [role, setRole] = useState<Role>('landlord');
+  
+  // Reset Password States (Q9)
+  const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+  const [resetStep, setResetStep] = useState<'phone' | 'otp'>('phone');
+  const [resetPhone, setResetPhone] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPass, setResetNewPass] = useState('');
+  const [resetConfirmPass, setResetConfirmPass] = useState('');
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const handleSendResetOtp = () => {
+    setResetError(null);
+    if (!resetPhone.trim()) {
+      setResetError(language === 'vi' ? 'Vui lòng nhập số điện thoại.' : 'Please enter your phone number.');
+      return;
+    }
+    
+    // Normalize phone number and verify
+    const normalized = resetPhone.replace(/[^0-9]/g, '');
+    const isLandlord = normalized.endsWith('901234567');
+    const isTenant = normalized.endsWith('909888777');
+    
+    if (!isLandlord && !isTenant) {
+      setResetError(local('err_phone_not_registered'));
+      return;
+    }
+    
+    setResetStep('otp');
+    Alert.alert(
+      language === 'vi' ? 'Đã gửi mã xác thực' : 'OTP Code Sent',
+      local('otp_message').replace('{phone}', resetPhone)
+    );
+  };
+
+  const handleConfirmResetPassword = () => {
+    setResetError(null);
+    if (!resetOtp.trim() || !resetNewPass.trim() || !resetConfirmPass.trim()) {
+      setResetError(language === 'vi' ? 'Vui lòng nhập đầy đủ thông tin.' : 'Please fill in all fields.');
+      return;
+    }
+    if (resetOtp !== '888888') {
+      setResetError(local('err_invalid_otp'));
+      return;
+    }
+    if (resetNewPass !== resetConfirmPass) {
+      setResetError(local('err_password_mismatch'));
+      return;
+    }
+    if (resetNewPass.length < 6) {
+      setResetError(local('err_password_too_short'));
+      return;
+    }
+
+    const res = AuthManager.resetPasswordByPhone(resetPhone, resetNewPass);
+    if (!res.success) {
+      setResetError(local(res.error || 'err_phone_not_registered'));
+      return;
+    }
+
+    Alert.alert(
+      language === 'vi' ? 'Thành công' : 'Success',
+      local('reset_success')
+    );
+    setIsResetModalVisible(false);
+    setResetPhone('');
+    setResetOtp('');
+    setResetNewPass('');
+    setResetConfirmPass('');
+  };
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [countryCode, setCountryCode] = useState('+84');
@@ -44,7 +117,6 @@ export default function Login() {
 
   // Theme Colors
   const themeColor = role === 'landlord' ? '#007AFF' : '#34C759'; // Blue vs Green
-  const logoGradient = role === 'landlord' ? ['#007AFF', '#5856D6'] : ['#34C759', '#30B0C7'];
 
   // Phone Validation
   const getPhoneLimit = (code: string) => {
@@ -96,6 +168,11 @@ export default function Login() {
     // Simulate API request delay
     setTimeout(() => {
       setIsLoading(false);
+      const isCorrect = AuthManager.verifyPassword(role, password);
+      if (!isCorrect) {
+        setErrorMessage(local('err_incorrect_password'));
+        return;
+      }
       login(role);
       router.replace(role === 'landlord' ? '/(landlord)/dashboard' : '/(tenant)/portal');
     }, 1000);
@@ -107,8 +184,9 @@ export default function Login() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.safeContainer}>
+    <View style={{ flex: 1 }}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <SafeAreaView style={styles.safeContainer}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardContainer}
@@ -128,14 +206,10 @@ export default function Login() {
           >
             {/* Logo Section */}
             <View style={styles.logoSection}>
-              <LinearGradient
-                colors={logoGradient as [string, string]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.logo}
-              >
-                <Text style={styles.logoLetter}>R</Text>
-              </LinearGradient>
+              <Image
+                source={require('../assets/rentify_logo.png')}
+                style={styles.logoImage}
+              />
               <Text style={styles.logoText}>Rentify</Text>
               <Text style={styles.logoSubtitle}>{local('subtitle')}</Text>
             </View>
@@ -265,6 +339,19 @@ export default function Login() {
                 />
               </View>
 
+              {/* Forgot Password Link Button (Q9) */}
+              <TouchableOpacity
+                style={styles.forgotBtn}
+                onPress={() => {
+                  setResetPhone(phoneNumber); // prefill from phone input
+                  setResetStep('phone');
+                  setResetError(null);
+                  setIsResetModalVisible(true);
+                }}
+              >
+                <Text style={[styles.forgotText, { color: themeColor }]}>{local('forgot_password')}</Text>
+              </TouchableOpacity>
+
               {/* Error Message */}
               {errorMessage && (
                 <Text style={styles.errorText}>{errorMessage}</Text>
@@ -318,6 +405,101 @@ export default function Login() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </TouchableWithoutFeedback>
+
+    {/* ─── Reset Password Modal Overlay (Q9) ─── */}
+    <Modal
+      visible={isResetModalVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setIsResetModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setIsResetModalVisible(false)}>
+              <Text style={styles.modalCancel}>{local('close')}</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{local('reset_password')}</Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <ScrollView style={styles.modalForm}>
+            {resetStep === 'phone' ? (
+              <View style={styles.resetStepContainer}>
+                <Text style={styles.resetInstruction}>
+                  {language === 'vi' 
+                    ? 'Nhập số điện thoại đã đăng ký để nhận mã khôi phục mật khẩu.' 
+                    : 'Enter your registered phone number to receive a recovery code.'}
+                </Text>
+                
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputIcon}>📞</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={language === 'vi' ? 'Số điện thoại' : 'Phone number'}
+                    placeholderTextColor="#8E8E93"
+                    keyboardType="numeric"
+                    value={resetPhone}
+                    onChangeText={setResetPhone}
+                  />
+                </View>
+
+                {resetError && <Text style={styles.resetErrorText}>{resetError}</Text>}
+
+                <TouchableOpacity style={[styles.resetSubmitBtn, { backgroundColor: themeColor }]} onPress={handleSendResetOtp}>
+                  <Text style={styles.resetSubmitBtnText}>{local('send_otp')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.resetStepContainer}>
+                <Text style={styles.resetInstruction}>
+                  {local('otp_message').replace('{phone}', resetPhone)}
+                </Text>
+
+                <Text style={styles.inputLabel}>{local('enter_otp')}</Text>
+                <TextInput
+                  style={styles.resetInput}
+                  placeholder="888888"
+                  placeholderTextColor="#8E8E93"
+                  keyboardType="numeric"
+                  value={resetOtp}
+                  onChangeText={setResetOtp}
+                  maxLength={6}
+                />
+
+                <Text style={styles.inputLabel}>{local('new_password')}</Text>
+                <TextInput
+                  style={styles.resetInput}
+                  secureTextEntry
+                  value={resetNewPass}
+                  onChangeText={setResetNewPass}
+                  placeholder="••••••"
+                  placeholderTextColor="#8E8E93"
+                />
+
+                <Text style={styles.inputLabel}>{local('confirm_new_password')}</Text>
+                <TextInput
+                  style={styles.resetInput}
+                  secureTextEntry
+                  value={resetConfirmPass}
+                  onChangeText={setResetConfirmPass}
+                  placeholder="••••••"
+                  placeholderTextColor="#8E8E93"
+                />
+
+                {resetError && <Text style={styles.resetErrorText}>{resetError}</Text>}
+
+                <TouchableOpacity style={[styles.resetSubmitBtn, { backgroundColor: themeColor }]} onPress={handleConfirmResetPassword}>
+                  <Text style={styles.resetSubmitBtnText}>{local('confirm_reset')}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  </View>
   );
 }
 
@@ -358,22 +540,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 36
   },
-  logo: {
-    width: 80,
-    height: 80,
+  logoImage: {
+    width: 100,
+    height: 100,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4
-  },
-  logoLetter: {
-    color: '#FFF',
-    fontSize: 38,
-    fontWeight: '900'
+    resizeMode: 'contain'
   },
   logoText: {
     fontSize: 28,
@@ -530,5 +701,89 @@ const styles = StyleSheet.create({
   quickLoginText: {
     fontSize: 14,
     color: '#1C1C1E'
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingVertical: 4
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  // Reset password modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '85%'
+  },
+  modalHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA'
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600'
+  },
+  modalTitle: {
+    fontWeight: '800',
+    fontSize: 16,
+    color: '#1C1C1E'
+  },
+  modalForm: {
+    padding: 16
+  },
+  resetStepContainer: {
+    gap: 12
+  },
+  resetInstruction: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
+    marginBottom: 8
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginTop: 4
+  },
+  resetInput: {
+    height: 44,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#1C1C1E'
+  },
+  resetSubmitBtn: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12
+  },
+  resetSubmitBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  resetErrorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2
   }
 });

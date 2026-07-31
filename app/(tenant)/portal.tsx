@@ -16,14 +16,22 @@ import {
   Platform,
   Alert,
   Linking,
-  Modal
+  Modal,
+  ActivityIndicator,
+  Vibration,
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { Database, Property, Lease, Payment } from '../../services/Database';
+import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useLanguage } from '../../services/LanguageManager';
+import { ProfileModal } from '../../components/ProfileModal';
+import { SettingsModal } from '../../components/SettingsModal';
 
 export default function TenantPortal() {
+  const { local } = useLanguage();
   const router = useRouter();
   const { logout } = useAuth();
 
@@ -35,6 +43,21 @@ export default function TenantPortal() {
   // Track currently selected lease context
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
   const [isContractVisible, setIsContractVisible] = useState(false);
+  const [isProfileVisible, setIsProfileVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const { adjustSize } = useElderlyMode();
+
+  // Meter Reading & Billing States
+  const [isMeterModalVisible, setIsMeterModalVisible] = useState(false);
+  const [meterReadingStep, setMeterReadingStep] = useState<'scan' | 'breakdown' | 'qr'>('scan');
+  const [meterKwh, setMeterKwh] = useState('');
+  const [isScanningLoader, setIsScanningLoader] = useState(false);
+  const [currentPaymentForBilling, setCurrentPaymentForBilling] = useState<Payment | null>(null);
+
+  const getPendingBill = () => {
+    return tenantPayments.find(p => p.status === 'Pending') || null;
+  };
 
   const loadTenantData = () => {
     const leases = Database.getLeases();
@@ -119,29 +142,68 @@ export default function TenantPortal() {
       {/* Top Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.welcomeText}>Welcome Back 👋</Text>
+          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>Welcome Back 👋</Text>
           {tenantLeases.length > 1 ? (
             <TouchableOpacity onPress={handleSwitchRoom} style={styles.roomSwitcherBtn}>
-              <Text style={styles.headerTitle}>
+              <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>
                 Jane Tenant ({property ? property.name : 'Select Room'} ▾)
               </Text>
             </TouchableOpacity>
           ) : (
-            <Text style={styles.headerTitle}>Jane Tenant</Text>
+            <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Jane Tenant</Text>
           )}
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/login'); }}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity 
+          style={styles.profileHeaderBtn} 
+          onPress={() => setIsDropdownVisible(!isDropdownVisible)}
+        >
+          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>JT</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ─── Profile Dropdown Menu Overlay ─── */}
+      {isDropdownVisible && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              setIsProfileVisible(true);
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 View Profile</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              setIsSettingsVisible(true);
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ Settings</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              logout();
+              router.replace('/login');
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 Logout</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Active Lease Agreement Card */}
         <View style={styles.leaseCard}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderTitleRow}>
-              <Text style={styles.cardHeaderIcon}>📄</Text>
-              <Text style={styles.cardHeaderTitle}>Active Lease Agreement</Text>
+              <Text style={[styles.cardHeaderIcon, { fontSize: adjustSize(16) }]}>📄</Text>
+              <Text style={[styles.cardHeaderTitle, { fontSize: adjustSize(14) }]}>Active Lease Agreement</Text>
             </View>
             <View style={styles.activeBadge}>
               <Text style={styles.activeBadgeText}>ACTIVE</Text>
@@ -152,29 +214,29 @@ export default function TenantPortal() {
 
           <View style={styles.leaseDetails}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Rental Address</Text>
-              <Text style={styles.detailValue}>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Rental Address</Text>
+              <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 {property ? property.address : '456 Greenway Blvd, Room 202'}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Monthly Rent</Text>
-              <Text style={styles.detailValue}>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Monthly Rent</Text>
+              <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 ${activeLease ? activeLease.monthlyRent.toLocaleString() : '1,200'}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Security Deposit</Text>
-              <Text style={styles.detailValue}>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Security Deposit</Text>
+              <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 ${activeLease ? activeLease.securityDeposit.toLocaleString() : '1,200'}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Lease Duration</Text>
-              <Text style={styles.detailValue}>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Lease Duration</Text>
+              <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 {activeLease
                   ? `${activeLease.startDate} - ${activeLease.endDate}`
                   : 'Aug 1, 2026 - Jul 31, 2027'}
@@ -183,14 +245,40 @@ export default function TenantPortal() {
           </View>
         </View>
 
+        {/* ─── Billing Action Banner (Missing MVP requirement) ─── */}
+        {getPendingBill() ? (
+          <TouchableOpacity 
+            style={styles.billingBanner}
+            onPress={() => {
+              setCurrentPaymentForBilling(getPendingBill());
+              setMeterKwh('');
+              setMeterReadingStep('scan');
+              setIsMeterModalVisible(true);
+            }}
+          >
+            <View style={styles.bannerInfo}>
+              <View style={styles.badgeRow}>
+                <Text style={styles.bannerBadge}>{local('unrecorded_electricity')}</Text>
+              </View>
+              <Text style={styles.bannerTitle}>{local('billing_banner_title')}</Text>
+              <Text style={styles.bannerSubtitle}>
+                {local('billing_banner_desc')}
+              </Text>
+            </View>
+            <View style={styles.bannerBtn}>
+              <Text style={styles.bannerBtnText}>{local('record_now')}</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
         {/* ─── Tenant Quick Actions & Links ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Links</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Quick Links</Text>
           <View style={styles.quickLinksRow}>
             {/* View contract */}
             <TouchableOpacity style={styles.linkCard} onPress={() => setIsContractVisible(true)}>
-              <Text style={styles.linkIcon}>📄</Text>
-              <Text style={styles.linkLabel}>Xem Hợp Đồng</Text>
+              <Text style={[styles.linkIcon, { fontSize: adjustSize(28) }]}>📄</Text>
+              <Text style={[styles.linkLabel, { fontSize: adjustSize(13) }]}>{local('view_lease')}</Text>
             </TouchableOpacity>
 
             {/* Contact Landlord */}
@@ -208,15 +296,15 @@ export default function TenantPortal() {
                 );
               }}
             >
-              <Text style={styles.linkIcon}>💬</Text>
-              <Text style={styles.linkLabel}>Liên Hệ Chủ Nhà</Text>
+              <Text style={[styles.linkIcon, { fontSize: adjustSize(28) }]}>💬</Text>
+              <Text style={[styles.linkLabel, { fontSize: adjustSize(13) }]}>{local('contact_landlord')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Payments List Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Rent Payments</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Your Rent Payments</Text>
           {tenantPayments.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyCardText}>No payment history logged.</Text>
@@ -226,12 +314,12 @@ export default function TenantPortal() {
               {tenantPayments.map((item, index) => (
                 <View key={item.id} style={styles.rowItem}>
                   <View style={styles.rowDetails}>
-                    <Text style={styles.rowPropName}>{item.notes || 'Rent Invoice'}</Text>
-                    <Text style={styles.rowDate}>Due: {item.dueDate}</Text>
+                    <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.notes || 'Rent Invoice'}</Text>
+                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>Due: {item.dueDate}</Text>
                   </View>
                   <View style={styles.rowValues}>
-                    <Text style={styles.rowAmount}>${item.amount.toLocaleString()}</Text>
-                    <Text style={[styles.rowStatus, { color: getStatusColor(item.status) }]}>
+                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>${item.amount.toLocaleString()}</Text>
+                    <Text style={[styles.rowStatus, { color: getStatusColor(item.status), fontSize: adjustSize(11) }]}>
                       {item.status}
                     </Text>
                   </View>
@@ -242,6 +330,240 @@ export default function TenantPortal() {
           )}
         </View>
       </ScrollView>
+      {/* ─── Meter reading, OCR extraction & QR pay flow ─── */}
+      <Modal visible={isMeterModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalContent}>
+            
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setIsMeterModalVisible(false)}>
+                <Text style={styles.modalCancel}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>
+                {meterReadingStep === 'scan' && local('snap_electricity_meter')}
+                {meterReadingStep === 'breakdown' && local('invoice_details')}
+                {meterReadingStep === 'qr' && local('scan_payment_qr')}
+              </Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            {/* Step 1: Scanner view */}
+            {meterReadingStep === 'scan' && (
+              <View style={{ flex: 1, backgroundColor: '#000' }}>
+                {isScanningLoader ? (
+                  <View style={styles.ocrLoaderContainer}>
+                    <ActivityIndicator size="large" color="#34C759" />
+                    <Text style={styles.ocrLoaderText}>{local('ocr_scanning')}</Text>
+                  </View>
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                    {/* Viewfinder area */}
+                    <View style={styles.viewfinderContainer}>
+                      <View style={styles.scanTarget} />
+                      <Text style={styles.cameraInstructions}>
+                        {local('align_meter_desc')}
+                      </Text>
+                    </View>
+
+                    {/* Camera Control Footer */}
+                    <View style={styles.cameraControls}>
+                      <TouchableOpacity
+                        style={styles.shutterButton}
+                        onPress={() => {
+                          setIsScanningLoader(true);
+                          setTimeout(() => {
+                            setIsScanningLoader(false);
+                            // Simulate successful OCR extraction
+                            setMeterKwh('235');
+                            setMeterReadingStep('breakdown');
+                            Vibration.vibrate(100);
+                          }, 1500);
+                        }}
+                      >
+                        <View style={styles.shutterInner} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Step 2: Bill Breakdown Screen */}
+            {meterReadingStep === 'breakdown' && (
+              <ScrollView style={styles.modalScroll}>
+                <Text style={styles.sectionLabel}>{local('meter_reading_section')}</Text>
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputLabel}>{local('consumption_kwh')}</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    keyboardType="numeric"
+                    value={meterKwh}
+                    onChangeText={setMeterKwh}
+                    placeholder={local('enter_meter_kwh')}
+                    placeholderTextColor="#8E8E93"
+                  />
+                </View>
+                <Text style={styles.inputHelperText}>
+                  * Chỉ số được trích xuất bằng camera OCR. Bạn có thể tự chỉnh sửa tay nếu nhận diện sai.
+                </Text>
+
+                <Text style={styles.sectionLabel}>{local('monthly_bill_details')}</Text>
+                <View style={styles.breakdownCard}>
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('base_rent')}</Text>
+                    <Text style={styles.breakdownValue}>
+                      ${activeLease ? activeLease.monthlyRent.toLocaleString() : '0'}
+                    </Text>
+                  </View>
+                  
+                  {/* Electricity unit price: property.electricityRate VND / 25000 = USD */}
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>
+                      Tiền điện ({Number(meterKwh || 0)} kWh × ${property ? (property.electricityRate / 25000).toFixed(2) : '0.14'})
+                    </Text>
+                    <Text style={styles.breakdownValue}>
+                      ${((Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14))).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  {/* Water flat rate: property.waterRate VND / 25000 = USD */}
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('water_bill')}</Text>
+                    <Text style={styles.breakdownValue}>
+                      ${property ? (property.waterRate / 25000).toFixed(2) : '0.00'}
+                    </Text>
+                  </View>
+
+                  {/* Service flat rate: property.serviceFee VND / 25000 = USD */}
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('services_bill')}</Text>
+                    <Text style={styles.breakdownValue}>
+                      ${property ? (property.serviceFee / 25000).toFixed(2) : '0.00'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.breakdownDivider} />
+
+                  <View style={styles.breakdownRowTotal}>
+                    <Text style={styles.breakdownLabelTotal}>{local('grand_total')}</Text>
+                    <Text style={styles.breakdownValueTotal}>
+                      ${(
+                        (activeLease ? activeLease.monthlyRent : 0) +
+                        (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
+                        (property ? property.waterRate / 25000 : 0) +
+                        (property ? property.serviceFee / 25000 : 0)
+                      ).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.payNowBtn}
+                  onPress={() => setMeterReadingStep('qr')}
+                >
+                  <Text style={styles.payNowBtnText}>{local('proceed_to_pay')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+
+            {/* Step 3: VietQR Code display */}
+            {meterReadingStep === 'qr' && (
+              <View style={styles.qrContainer}>
+                <Text style={styles.qrTitle}>{local('vietqr_transfer')}</Text>
+                <Text style={styles.qrSubtitle}>
+                  {local('vietqr_instruction')}
+                </Text>
+
+                {/* Mock QR graphic */}
+                <View style={styles.qrGraphicCard}>
+                  <View style={styles.qrTopHeader}>
+                    <Text style={styles.qrBrand}>VietQR</Text>
+                    <Text style={styles.qrBankName}>MB Bank</Text>
+                  </View>
+                  
+                  {/* Decorative QR code mockup */}
+                  <View style={styles.qrGraphicPlaceholder}>
+                    <View style={[styles.qrCorner, { top: 0, left: 0 }]} />
+                    <View style={[styles.qrCorner, { top: 0, right: 0 }]} />
+                    <View style={[styles.qrCorner, { bottom: 0, left: 0 }]} />
+                    <View style={styles.qrCenterDot} />
+                    <Text style={styles.qrCenterText}>RENTIFY PAY</Text>
+                  </View>
+
+                  <View style={styles.qrAmountRow}>
+                    <Text style={styles.qrAmountLabel}>{local('payment_amount')}</Text>
+                    <Text style={styles.qrAmountValue}>
+                      ${(
+                        (activeLease ? activeLease.monthlyRent : 0) +
+                        (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
+                        (property ? property.waterRate / 25000 : 0) +
+                        (property ? property.serviceFee / 25000 : 0)
+                      ).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Details layout */}
+                <View style={styles.transferDetailCard}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{local('account_holder')}</Text>
+                    <Text style={styles.detailValue}>NGUYEN VAN CHU NHA</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{local('account_number')}</Text>
+                    <Text style={styles.detailValue}>0901234567</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{local('transfer_message')}</Text>
+                    <Text style={styles.detailValue}>
+                      Rentify thanh toan {property ? property.name : 'phong'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.confirmPayBtn}
+                  onPress={() => {
+                    const finalAmount = (
+                      (activeLease ? activeLease.monthlyRent : 0) +
+                      (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
+                      (property ? property.waterRate / 25000 : 0) +
+                      (property ? property.serviceFee / 25000 : 0)
+                    );
+                    
+                    if (currentPaymentForBilling) {
+                      Database.updatePaymentAmountAndStatus(
+                        currentPaymentForBilling.id,
+                        finalAmount,
+                        'Paid'
+                      );
+                    }
+                    
+                    Vibration.vibrate([0, 100, 50, 100]);
+                    Alert.alert(local('payment_success'), local('payment_success_desc'));
+                    setIsMeterModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.confirmPayBtnText}>{local('confirm_transferred')}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      <ProfileModal
+        visible={isProfileVisible}
+        onClose={() => setIsProfileVisible(false)}
+      />
+
+      <SettingsModal
+        visible={isSettingsVisible}
+        onClose={() => setIsSettingsVisible(false)}
+      />
+
       {/* ─── Contract Viewer Modal ─── */}
       <Modal visible={isContractVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -418,6 +740,322 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontStyle: 'italic'
   },
+  // ─── Billing Action Banner ───
+  billingBanner: {
+    backgroundColor: '#FF95001A',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#FF95004D'
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    marginBottom: 6
+  },
+  bannerBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FF9500',
+    backgroundColor: '#FF950026',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    overflow: 'hidden'
+  },
+  bannerInfo: {
+    flex: 1,
+    paddingRight: 10
+  },
+  bannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 4
+  },
+  bannerSubtitle: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600'
+  },
+  bannerBtn: {
+    backgroundColor: '#FF9500',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8
+  },
+  bannerBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  // ─── OCR view styles ───
+  ocrLoaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000'
+  },
+  ocrLoaderText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 16
+  },
+  viewfinderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  scanTarget: {
+    width: 260,
+    height: 160,
+    borderWidth: 2.5,
+    borderColor: '#34C759',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)'
+  },
+  cameraInstructions: {
+    color: '#E5E5EA',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 30,
+    marginTop: 24
+  },
+  shutterButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 40
+  },
+  shutterInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFF'
+  },
+  cameraControls: {
+    backgroundColor: '#000',
+    paddingVertical: 20
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    marginTop: 24,
+    marginBottom: 8
+  },
+  inputCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  textInput: {
+    width: 120,
+    height: 36,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    padding: 0
+  },
+  inputHelperText: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+    marginTop: 6,
+    lineHeight: 16
+  },
+  breakdownCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  breakdownLabel: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontWeight: '600'
+  },
+  breakdownValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 4
+  },
+  breakdownRowTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  breakdownLabelTotal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  breakdownValueTotal: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#34C759'
+  },
+  payNowBtn: {
+    height: 52,
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    marginBottom: 40
+  },
+  payNowBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  // ─── VietQR views ───
+  qrContainer: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center'
+  },
+  qrTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 6
+  },
+  qrSubtitle: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 20,
+    marginBottom: 20
+  },
+  qrGraphicCard: {
+    width: '100%',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  qrTopHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16
+  },
+  qrBrand: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#007AFF',
+    fontStyle: 'italic'
+  },
+  qrBankName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#5856D6'
+  },
+  qrGraphicPlaceholder: {
+    width: 160,
+    height: 160,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: 16
+  },
+  qrCorner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderWidth: 3,
+    borderColor: '#34C759'
+  },
+  qrCenterDot: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#34C759',
+    borderRadius: 8
+  },
+  qrCenterText: {
+    position: 'absolute',
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900'
+  },
+  qrAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  qrAmountLabel: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontWeight: '600'
+  },
+  qrAmountValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#1C1C1E'
+  },
+  transferDetailCard: {
+    width: '100%',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+    marginBottom: 30
+  },
+  confirmPayBtn: {
+    height: 52,
+    width: '100%',
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20
+  },
+  confirmPayBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '800'
+  },
   logoutButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -567,5 +1205,50 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 16,
     right: 16
+  },
+  profileHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#34C7591F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#34C759'
+  },
+  profileHeaderInitials: {
+    fontWeight: '900',
+    color: '#34C759'
+  },
+  // Dropdown overlay styles
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 125, // right under header in safearea
+    right: 16,
+    width: 160,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
+    zIndex: 9999
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center'
+  },
+  dropdownItemText: {
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#F2F2F7'
   }
 });

@@ -13,13 +13,18 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Modal
+  Modal,
+  Platform,
+  ActionSheetIOS
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { Database } from '../../services/Database';
+import { useElderlyMode } from '../../services/AccessibilityManager';
+import { ProfileModal } from '../../components/ProfileModal';
+import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
 
 export default function LandlordDashboard() {
@@ -37,6 +42,10 @@ export default function LandlordDashboard() {
 
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
   const [isReportVisible, setIsReportVisible] = useState(false);
+  const [isProfileVisible, setIsProfileVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const { adjustSize } = useElderlyMode();
 
   // Calculate Metrics from Database
   const calculateMetrics = () => {
@@ -126,49 +135,88 @@ export default function LandlordDashboard() {
       {/* Top Header View */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.welcomeText}>Welcome Back 👋</Text>
-          <Text style={styles.headerTitle}>Rentify Dashboard</Text>
+          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>Welcome Back 👋</Text>
+          <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Rentify Dashboard</Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/login'); }}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity 
+          style={styles.profileHeaderBtn} 
+          onPress={() => setIsDropdownVisible(!isDropdownVisible)}
+        >
+          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>NL</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ─── Profile Dropdown Menu Overlay ─── */}
+      {isDropdownVisible && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              setIsProfileVisible(true);
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 View Profile</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              setIsSettingsVisible(true);
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ Settings</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => {
+              setIsDropdownVisible(false);
+              logout();
+              router.replace('/login');
+            }}
+          >
+            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 Logout</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Metrics Grid */}
         <View style={styles.grid}>
           {/* Card 1 */}
           <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>💰</Text>
-            <Text style={styles.metricValue}>${metrics.totalRevenue.toLocaleString()}</Text>
-            <Text style={styles.metricTitle}>Monthly Revenue</Text>
+            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>💰</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.totalRevenue.toLocaleString()}</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Monthly Revenue</Text>
           </View>
 
           {/* Card 2 */}
           <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>⚠️</Text>
-            <Text style={styles.metricValue}>${metrics.unpaidBalance.toLocaleString()}</Text>
-            <Text style={styles.metricTitle}>Unpaid Balance</Text>
+            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>⚠️</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.unpaidBalance.toLocaleString()}</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Unpaid Balance</Text>
           </View>
 
           {/* Card 3 */}
           <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>🏠</Text>
-            <Text style={styles.metricValue}>{metrics.occupancyRate.toFixed(1)}%</Text>
-            <Text style={styles.metricTitle}>Occupancy Rate</Text>
+            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>🏠</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.occupancyRate.toFixed(1)}%</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Occupancy Rate</Text>
           </View>
 
           {/* Card 4 */}
           <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>📄</Text>
-            <Text style={styles.metricValue}>{metrics.activeLeasesCount}</Text>
-            <Text style={styles.metricTitle}>Active Leases</Text>
+            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>📄</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.activeLeasesCount}</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Active Leases</Text>
           </View>
         </View>
 
         {/* ─── Landlord Quick Actions Row ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Quick Actions</Text>
           <View style={styles.actionsRow}>
             {/* Create Lease action */}
             <TouchableOpacity
@@ -178,7 +226,7 @@ export default function LandlordDashboard() {
               <View style={[styles.actionIconContainer, { backgroundColor: '#007AFF15' }]}>
                 <Text style={styles.actionIcon}>📝</Text>
               </View>
-              <Text style={styles.actionLabel}>Tạo HĐ</Text>
+              <Text style={styles.actionLabel}>{local('create_lease')}</Text>
             </TouchableOpacity>
 
             {/* Remind Rent action */}
@@ -186,7 +234,7 @@ export default function LandlordDashboard() {
               <View style={[styles.actionIconContainer, { backgroundColor: '#FF950015' }]}>
                 <Text style={styles.actionIcon}>🔔</Text>
               </View>
-              <Text style={styles.actionLabel}>Nhắc Phí</Text>
+              <Text style={styles.actionLabel}>{local('send_reminder')}</Text>
             </TouchableOpacity>
 
             {/* Show Reports modal */}
@@ -194,7 +242,7 @@ export default function LandlordDashboard() {
               <View style={[styles.actionIconContainer, { backgroundColor: '#34C75915' }]}>
                 <Text style={styles.actionIcon}>📈</Text>
               </View>
-              <Text style={styles.actionLabel}>Báo Cáo</Text>
+              <Text style={styles.actionLabel}>{local('view_reports')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -231,7 +279,7 @@ export default function LandlordDashboard() {
 
         {/* Recent Payments Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Payments</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Recent Payments</Text>
           {recentPayments.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyCardText}>No recent payments logged.</Text>
@@ -323,14 +371,24 @@ export default function LandlordDashboard() {
               <Text style={styles.modalSectionLabel}>Performance Insights</Text>
               <View style={styles.insightBox}>
                 <Text style={styles.insightText}>
-                  💡 Your occupancy rate is currently sitting at **{metrics.occupancyRate.toFixed(0)}%**. 
-                  Filling vacant rooms could boost monthly revenue by up to **$2,500**.
+                  💡 Your occupancy rate is currently sitting at <Text style={styles.boldText}>{metrics.occupancyRate.toFixed(0)}%</Text>. 
+                  Filling vacant rooms could boost monthly revenue by up to <Text style={styles.boldText}>$2,500</Text>.
                 </Text>
               </View>
             </ScrollView>
           </SafeAreaView>
         </View>
       </Modal>
+
+      <ProfileModal
+        visible={isProfileVisible}
+        onClose={() => setIsProfileVisible(false)}
+      />
+
+      <SettingsModal
+        visible={isSettingsVisible}
+        onClose={() => setIsSettingsVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -670,5 +728,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18
+  },
+  boldText: {
+    fontWeight: '800'
+  },
+  profileHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#007AFF1F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#007AFF'
+  },
+  profileHeaderInitials: {
+    fontWeight: '900',
+    color: '#007AFF'
+  },
+  // Dropdown overlay styles
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 125, // right under header in safearea
+    right: 16,
+    width: 160,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
+    zIndex: 9999
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center'
+  },
+  dropdownItemText: {
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#F2F2F7'
   }
 });

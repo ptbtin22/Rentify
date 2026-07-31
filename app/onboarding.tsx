@@ -84,6 +84,79 @@ export default function Onboarding() {
     router.replace('/login');
   };
 
+  const renderMockup = (index: number) => {
+    switch (index) {
+      case 0:
+        return (
+          <View style={styles.mockupContainer}>
+            <View style={styles.mockupHeader}>
+              <Text style={styles.mockupTitle}>Khu Oakridge (Complex)</Text>
+              <Text style={styles.mockupSub}>12 Rooms • 88% Occupied</Text>
+            </View>
+            <View style={styles.mockupItem}>
+              <Text style={styles.mockupItemText}>🚪 Phòng 202 (Room 202)</Text>
+              <Text style={styles.mockupItemStatusGreen}>Active Lease</Text>
+            </View>
+            <View style={styles.mockupItem}>
+              <Text style={styles.mockupItemText}>🚪 Phòng 104 (Room 104)</Text>
+              <Text style={styles.mockupItemStatusGreen}>Active Lease</Text>
+            </View>
+            <View style={styles.mockupItem}>
+              <Text style={styles.mockupItemText}>🚪 Phòng 301 (Room 301)</Text>
+              <Text style={styles.mockupItemStatusOrange}>Vacant</Text>
+            </View>
+          </View>
+        );
+      case 1:
+        return (
+          <View style={styles.mockupContainer}>
+            <View style={styles.mockupHeader}>
+              <Text style={styles.mockupTitle}>Hóa Đơn Tháng 10 (Invoices)</Text>
+              <Text style={styles.mockupSub}>Phòng 202 • Jane Tenant</Text>
+            </View>
+            <View style={styles.mockupRow}>
+              <Text style={styles.mockupRowLabel}>Tiền phòng (Room Rent):</Text>
+              <Text style={styles.mockupRowVal}>$1,200</Text>
+            </View>
+            <View style={styles.mockupRow}>
+              <Text style={styles.mockupRowLabel}>Chỉ số điện (235 kWh):</Text>
+              <Text style={styles.mockupRowVal}>$32.90</Text>
+            </View>
+            <View style={styles.mockupDivider} />
+            <View style={styles.mockupRowTotal}>
+              <Text style={styles.mockupTotalLabel}>Tổng cộng (Total):</Text>
+              <Text style={styles.mockupTotalVal}>$1,238.90</Text>
+            </View>
+            <View style={styles.mockupQrBadge}>
+              <Text style={styles.mockupQrText}>📲 Quét VietQR / MoMo Pay</Text>
+            </View>
+          </View>
+        );
+      case 2:
+        return (
+          <View style={[styles.mockupContainer, { borderColor: '#FF3B30', backgroundColor: '#FF3B300A' }]}>
+            <View style={styles.mockupHeader}>
+              <Text style={[styles.mockupTitle, { color: '#FF3B30' }]}>⚠️ BÁO CHÁY KHẨN CẤP</Text>
+              <Text style={[styles.mockupSub, { color: '#FF3B30' }]}>Hệ thống loa warning + haptics</Text>
+            </View>
+            <View style={styles.mockupAlertBox}>
+              <Text style={styles.mockupAlertText}>
+                🚨 CẢNH BÁO: KHU TRỌ CÓ CHÁY! VUI LÒNG DI TẢN!
+              </Text>
+            </View>
+            <View style={styles.mockupIndicatorRow}>
+              <View style={styles.mockupIndicatorCircle}>
+                <Text style={styles.mockupIndicatorCount}>5 TAPS</Text>
+              </View>
+              <Text style={styles.mockupIndicatorLabel}>Nhấn 5 lần để kích hoạt</Text>
+            </View>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
   const currentSlide = slides[currentIndex];
   const isLastSlide = currentIndex === slides.length - 1;
 
@@ -116,10 +189,13 @@ export default function Onboarding() {
       >
         {slides.map((slide, index) => (
           <View key={index} style={styles.slideContainer}>
-            {/* Circle Visual Container */}
-            <View style={[styles.iconCircle, { backgroundColor: slide.color + '1F' }]}>
-              <Ionicons name={slide.iconName} size={70} color={slide.color} />
+            {/* Circle Visual Container with Icon */}
+            <View style={[styles.iconCircle, { backgroundColor: slide.color + '10' }]}>
+              <Ionicons name={slide.iconName} size={54} color={slide.color} />
             </View>
+
+            {/* Simulated Live UI Mockups (Wow factor) */}
+            {renderMockup(index)}
 
             {/* Text details */}
             <View style={styles.textContainer}>
@@ -213,7 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40
+    marginBottom: 16
   },
   textContainer: {
     alignItems: 'center',
@@ -247,6 +323,149 @@ const styles = StyleSheet.create({
   indicator: {
     height: 8,
     borderRadius: 4
+  },
+  // Onboarding UI Mockups
+  mockupContainer: {
+    width: '90%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    padding: 16,
+    marginBottom: 36,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3
+  },
+  mockupHeader: {
+    marginBottom: 12
+  },
+  mockupTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  mockupSub: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600',
+    marginTop: 2
+  },
+  mockupItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+    alignItems: 'center'
+  },
+  mockupItemText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  mockupItemStatusGreen: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#34C759',
+    backgroundColor: '#34C7591A',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4
+  },
+  mockupItemStatusOrange: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FF9500',
+    backgroundColor: '#FF95001A',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4
+  },
+  mockupRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4
+  },
+  mockupRowLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+    fontWeight: '600'
+  },
+  mockupRowVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  mockupDivider: {
+    height: 1,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 6
+  },
+  mockupRowTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  mockupTotalLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  mockupTotalVal: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#34C759'
+  },
+  mockupQrBadge: {
+    alignItems: 'center',
+    backgroundColor: '#34C7591A',
+    borderRadius: 8,
+    paddingVertical: 6
+  },
+  mockupQrText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#34C759'
+  },
+  mockupAlertBox: {
+    backgroundColor: '#FF3B301A',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12
+  },
+  mockupAlertText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FF3B30',
+    textAlign: 'center',
+    lineHeight: 16
+  },
+  mockupIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  mockupIndicatorCircle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  mockupIndicatorCount: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900'
+  },
+  mockupIndicatorLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FF3B30'
   },
   indicatorActive: {
     width: 24

@@ -18,20 +18,35 @@ import {
   ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Database, Property, PropertyType, Lease } from '../../services/Database';
+import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../services/Database';
+import { useLanguage } from '../../services/LanguageManager';
+import { useElderlyMode } from '../../services/AccessibilityManager';
 
 export default function LandlordProperties() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const [khuTros, setKhuTros] = useState<KhuTro[]>([]);
 
   // Modals
   const [isAddVisible, setIsAddVisible] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [isKhuModalVisible, setIsKhuModalVisible] = useState(false);
 
-  // Form Fields
+  // Form Fields for Room
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [selectedKhuTroId, setSelectedKhuTroId] = useState('');
+
+  // Form Fields for Khu
+  const [newKhuName, setNewKhuName] = useState('');
+  const [newKhuAddress, setNewKhuAddress] = useState('');
+
+  // Filtering
+  const [selectedKhuFilterId, setSelectedKhuFilterId] = useState<'all' | string>('all');
+  
+  const { local } = useLanguage();
+  const { isElderly, adjustSize } = useElderlyMode();
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
   const [rentAmount, setRentAmount] = useState('1500');
   const [bedrooms, setBedrooms] = useState(2);
@@ -43,9 +58,19 @@ export default function LandlordProperties() {
   const types: PropertyType[] = ['Apartment', 'House', 'Condo', 'Townhouse'];
 
   const refreshData = () => {
-    setProperties([...Database.getProperties()]);
-    setLeases([...Database.getLeases()]);
-    setTenants([...Database.getTenants()]);
+    const props = Database.getProperties();
+    const activeLeases = Database.getLeases();
+    const currentTenants = Database.getTenants();
+    const complexes = Database.getKhuTros();
+
+    setProperties([...props]);
+    setLeases([...activeLeases]);
+    setTenants([...currentTenants]);
+    setKhuTros([...complexes]);
+
+    if (complexes.length > 0 && !selectedKhuTroId) {
+      setSelectedKhuTroId(complexes[0].id);
+    }
   };
 
   useEffect(() => {
@@ -59,6 +84,7 @@ export default function LandlordProperties() {
 
     Database.addProperty({
       name,
+      khuTroId: selectedKhuTroId,
       address,
       propertyType,
       rentAmount: Number(rentAmount),
@@ -100,6 +126,34 @@ export default function LandlordProperties() {
     );
   };
 
+  const handleSaveKhu = () => {
+    if (!newKhuName.trim() || !newKhuAddress.trim()) return;
+    Database.addKhuTro(newKhuName, newKhuAddress);
+    setNewKhuName('');
+    setNewKhuAddress('');
+    Alert.alert(local('complex_success_title'), local('complex_success_desc'));
+  };
+
+  const handleDeleteKhu = (id: string) => {
+    Alert.alert(
+      'Xóa Khu Trọ',
+      'Xóa khu trọ này sẽ đồng thời xóa toàn bộ các phòng và hợp đồng nằm trong khu. Bạn có chắc muốn tiếp tục?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { 
+          text: 'Xóa', 
+          style: 'destructive', 
+          onPress: () => {
+            Database.deleteKhuTro(id);
+            if (selectedKhuFilterId === id) {
+              setSelectedKhuFilterId('all');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Get active tenant for detail view
   const getLeaseHistory = (propId: string) => {
     return leases
@@ -113,19 +167,54 @@ export default function LandlordProperties() {
       });
   };
 
+  const filteredProperties = properties.filter(
+    p => selectedKhuFilterId === 'all' || p.khuTroId === selectedKhuFilterId
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Properties</Text>
-        <TouchableOpacity onPress={() => setIsAddVisible(true)}>
-          <Text style={styles.addText}>➕ Add</Text>
-        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('properties') || 'Properties'}</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.khuManageBtn} onPress={() => setIsKhuModalVisible(true)}>
+            <Text style={[styles.khuManageText, { fontSize: adjustSize(13) }]}>⚙️ {local('manage_complexes')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtnHeader} onPress={() => setIsAddVisible(true)}>
+            <Text style={[styles.addText, { fontSize: adjustSize(13), color: '#007AFF' }]}>➕ {local('add_room') || 'Add Room'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ─── Khu Trọ Switcher Chips Row ─── */}
+      <View style={styles.switcherContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherScroll}>
+          <TouchableOpacity
+            style={[styles.chip, selectedKhuFilterId === 'all' && styles.activeChip]}
+            onPress={() => setSelectedKhuFilterId('all')}
+          >
+            <Text style={[styles.chipText, selectedKhuFilterId === 'all' && styles.activeChipText, { fontSize: adjustSize(13) }]}>
+              {local('all_complexes')}
+            </Text>
+          </TouchableOpacity>
+
+          {khuTros.map(k => (
+            <TouchableOpacity
+              key={k.id}
+              style={[styles.chip, selectedKhuFilterId === k.id && styles.activeChip]}
+              onPress={() => setSelectedKhuFilterId(k.id)}
+            >
+              <Text style={[styles.chipText, selectedKhuFilterId === k.id && styles.activeChipText]}>
+                {k.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Properties List */}
       <FlatList
-        data={properties}
+        data={filteredProperties}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -144,7 +233,9 @@ export default function LandlordProperties() {
             </View>
 
             <View style={styles.details}>
-              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.name}>
+                {item.name} • <Text style={{ fontSize: 13, color: '#8E8E93' }}>{khuTros.find(k => k.id === item.khuTroId)?.name || 'Khu trọ'}</Text>
+              </Text>
               <Text style={styles.address}>{item.address}</Text>
             </View>
 
@@ -165,25 +256,127 @@ export default function LandlordProperties() {
         )}
       />
 
-      {/* Add Property Modal */}
-      <Modal visible={isAddVisible} animationType="slide" transparent>
+      {/* ─── local('manage_complexes_title') ─── */}
+      <Modal 
+        visible={isKhuModalVisible} 
+        animationType="slide" 
+        transparent
+        onRequestClose={() => setIsKhuModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
+            
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setIsKhuModalVisible(false)}>
+                <Text style={styles.modalCancel}>{local('cancel')}</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { fontSize: adjustSize(17) }]}>{local('manage_complexes')}</Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            <ScrollView style={styles.formScroll}>
+              
+              {/* Add Khu Form */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('add_complex')}</Text>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={[styles.textInput, { fontSize: adjustSize(15) }]}
+                  placeholder={local('complex_name')}
+                  placeholderTextColor="#8E8E93"
+                  value={newKhuName}
+                  onChangeText={setNewKhuName}
+                />
+              </View>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={[styles.textInput, { fontSize: adjustSize(15) }]}
+                  placeholder={local('complex_address')}
+                  placeholderTextColor="#8E8E93"
+                  value={newKhuAddress}
+                  onChangeText={setNewKhuAddress}
+                />
+              </View>
+              <TouchableOpacity style={styles.addKhuSubmitBtn} onPress={handleSaveKhu}>
+                <Text style={[styles.addKhuSubmitText, { fontSize: adjustSize(14) }]}>{local('add_complex')}</Text>
+              </TouchableOpacity>
+
+              <View style={styles.configDivider} />
+
+              {/* Lists of existing complexes */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('current_complexes')}</Text>
+              {khuTros.length === 0 ? (
+                <View style={styles.emptyLease}>
+                  <Text style={styles.emptyLeaseText}>{local('no_complexes_created')}</Text>
+                </View>
+              ) : (
+                <View style={styles.khuListContainer}>
+                  {khuTros.map(k => (
+                    <View key={k.id} style={styles.khuListItem}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.khuListName}>{k.name}</Text>
+                        <Text style={styles.khuListAddr}>{k.address}</Text>
+                      </View>
+                      <TouchableOpacity style={styles.khuListDeleteBtn} onPress={() => handleDeleteKhu(k.id)}>
+                        <Text style={[styles.khuListDeleteText, { fontSize: adjustSize(12) }]}>{local('delete')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Property Modal */}
+      <Modal 
+        visible={isAddVisible} 
+        animationType="slide" 
+        transparent
+        onRequestClose={() => setIsAddVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsAddVisible(false)}>
-                <Text style={styles.modalCancel}>Cancel</Text>
+                <Text style={styles.modalCancel}>{local('cancel')}</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Add Property</Text>
+              <Text style={[styles.modalTitle, { fontSize: adjustSize(17) }]}>{local('add_room') || 'Add Room'}</Text>
               <TouchableOpacity
                 onPress={handleSave}
                 disabled={!name.trim() || !address.trim()}
                 style={(!name.trim() || !address.trim()) && { opacity: 0.5 }}
               >
-                <Text style={styles.modalSave}>Save</Text>
+                <Text style={styles.modalSave}>{local('save') || 'Save'}</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.formScroll}>
+              {/* Parent Khu selector */}
+              <Text style={styles.label}>{local('select_complex_label')}</Text>
+              <View style={styles.segmentedContainer}>
+                {khuTros.map(k => (
+                  <TouchableOpacity
+                    key={k.id}
+                    style={[
+                      styles.segmentButton,
+                      selectedKhuTroId === k.id && { backgroundColor: '#007AFF' }
+                    ]}
+                    onPress={() => setSelectedKhuTroId(k.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        selectedKhuTroId === k.id && { color: '#FFF', fontWeight: '700' }
+                      ]}
+                    >
+                      {k.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Text style={styles.label}>General Information</Text>
               
               <View style={styles.inputBox}>
@@ -310,12 +503,17 @@ export default function LandlordProperties() {
                 </View>
               </View>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
 
       {/* Property Detail Modal */}
-      <Modal visible={selectedProperty !== null} animationType="slide" transparent>
+      <Modal 
+        visible={selectedProperty !== null} 
+        animationType="slide" 
+        transparent
+        onRequestClose={() => setSelectedProperty(null)}
+      >
         {selectedProperty && (
           <View style={styles.modalOverlay}>
             <SafeAreaView style={styles.modalContent}>
@@ -413,13 +611,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF'
   },
   header: {
-    height: 60,
+    minHeight: 68,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA'
+    borderBottomColor: '#E5E5EA',
+    gap: 8
   },
   headerTitle: {
     fontSize: 20,
@@ -696,5 +896,111 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 15,
     fontWeight: '700'
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  khuManageBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 10
+  },
+  khuManageText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8E8E93'
+  },
+  addBtnHeader: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#007AFF1A',
+    borderRadius: 10
+  },
+  // Switcher styles
+  switcherContainer: {
+    height: 48,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+    marginBottom: 8
+  },
+  switcherScroll: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 8
+  },
+  chip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: 'transparent'
+  },
+  activeChip: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF'
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8E8E93'
+  },
+  activeChipText: {
+    color: '#FFF'
+  },
+  // Khu list CRUD modal
+  addKhuSubmitBtn: {
+    height: 44,
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12
+  },
+  addKhuSubmitText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  configDivider: {
+    height: 1,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 20
+  },
+  khuListContainer: {
+    gap: 12
+  },
+  khuListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 12,
+    justifyContent: 'space-between'
+  },
+  khuListName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  khuListAddr: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2
+  },
+  khuListDeleteBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#FF3B301A',
+    borderRadius: 8
+  },
+  khuListDeleteText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FF3B30'
   }
 });

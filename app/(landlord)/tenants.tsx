@@ -20,8 +20,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease } from '../../services/Database';
+import { useLanguage } from '../../services/LanguageManager';
 
 export default function LandlordTenants() {
+  const { local } = useLanguage();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
@@ -264,7 +266,7 @@ export default function LandlordTenants() {
                         Linking.openURL(`https://zalo.me/${cleanPhone}`);
                       }}
                     >
-                      <Text style={styles.zaloBtnText}>💬 Chat on Zalo / Liên hệ Zalo</Text>
+                      <Text style={styles.zaloBtnText}>{local('chat_on_zalo')}</Text>
                     </TouchableOpacity>
                   ) : null}
                   {selectedTenant.notes ? (
