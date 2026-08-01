@@ -204,11 +204,19 @@ export default function TenantNotices() {
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { fontSize: adjustSize(18) }]}>{local('bulletin_board')}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setIsComposeVisible(true)}>
-            <Text style={[styles.actionButtonText, { color: themeColor }]}>📝 {local('new_post')}</Text>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => setIsComposeVisible(true)}
+            accessibilityLabel={local('new_post')}
+          >
+            <Text style={[styles.actionButtonText, { color: themeColor, fontSize: adjustSize(16) }]}>📝</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.fireButton} onPress={handleReportFire}>
-            <Text style={styles.fireButtonText}>🔥 {local('report_fire')}</Text>
+          <TouchableOpacity 
+            style={styles.fireButton} 
+            onPress={handleReportFire}
+            accessibilityLabel={local('report_fire')}
+          >
+            <Text style={[styles.fireButtonText, { fontSize: adjustSize(16) }]}>🔥</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -472,14 +480,15 @@ const styles = StyleSheet.create({
     color: '#1C1C1E'
   },
   fireButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#FF3B301A',
-    borderRadius: 12
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   fireButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 16,
     color: '#FF3B30'
   },
   listContent: {
@@ -661,14 +670,15 @@ const styles = StyleSheet.create({
     gap: 12
   },
   actionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#34C7591A',
-    borderRadius: 10
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700'
+    fontSize: 16
   },
   // Modal overlay form styles
   modalOverlay: {

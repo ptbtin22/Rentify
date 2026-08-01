@@ -173,11 +173,19 @@ export default function LandlordNotices() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{local('announcements')}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.configActionBtn} onPress={() => setIsConfigVisible(true)}>
-            <Text style={styles.configActionText}>{local('billing_config')}</Text>
+          <TouchableOpacity 
+            style={styles.configActionBtn} 
+            onPress={() => setIsConfigVisible(true)}
+            accessibilityLabel={local('billing_config')}
+          >
+            <Text style={[styles.configActionText, { fontSize: adjustSize(16) }]}>⚙️</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setIsComposeVisible(true)}>
-            <Text style={[styles.actionButtonText, { color: themeColor }]}>📝 {local('new_post')}</Text>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => setIsComposeVisible(true)}
+            accessibilityLabel={local('new_post')}
+          >
+            <Text style={[styles.actionButtonText, { color: themeColor, fontSize: adjustSize(16) }]}>📝</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -583,14 +591,15 @@ const styles = StyleSheet.create({
     color: '#1C1C1E'
   },
   actionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F2F2F7',
-    borderRadius: 12
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700'
+    fontSize: 16
   },
   listContent: {
     padding: 16,
@@ -752,15 +761,15 @@ const styles = StyleSheet.create({
     gap: 12
   },
   configActionBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F2F2F7',
-    borderRadius: 10
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   configActionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8E8E93'
+    fontSize: 16
   },
   // Config Modal Specific Styles
   configItemRow: {
