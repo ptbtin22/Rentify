@@ -26,6 +26,8 @@ import { useElderlyMode } from '../../services/AccessibilityManager';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
+import { PostDetailModal } from '../../components/PostDetailModal';
+import { Notice } from '../../services/NoticeRepository';
 
 export default function LandlordDashboard() {
   const router = useRouter();
@@ -44,6 +46,7 @@ export default function LandlordDashboard() {
   const [isReportVisible, setIsReportVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const { adjustSize } = useElderlyMode();
 
@@ -383,11 +386,24 @@ export default function LandlordDashboard() {
       <ProfileModal
         visible={isProfileVisible}
         onClose={() => setIsProfileVisible(false)}
+        onPostClick={(item) => {
+          setIsProfileVisible(false);
+          setTimeout(() => {
+            setSelectedDetailPost(item);
+          }, 400);
+        }}
       />
 
       <SettingsModal
         visible={isSettingsVisible}
         onClose={() => setIsSettingsVisible(false)}
+      />
+
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName="Landlord"
+        onClose={() => setSelectedDetailPost(null)}
       />
     </SafeAreaView>
   );

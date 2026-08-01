@@ -394,7 +394,12 @@ export default function TenantNotices() {
               renderItem={({ item }) => (
                 <TouchableOpacity 
                   style={styles.posterPostCard}
-                  onPress={() => setSelectedDetailPost(item)}
+                  onPress={() => {
+                    setIsPosterProfileVisible(false);
+                    setTimeout(() => {
+                      setSelectedDetailPost(item);
+                    }, 400);
+                  }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
@@ -411,17 +416,16 @@ export default function TenantNotices() {
                 </Text>
               }
             />
-
-            <PostDetailModal
-              visible={selectedDetailPost !== null}
-              item={selectedDetailPost}
-              commenterName={getTenantSenderName()}
-              onClose={() => setSelectedDetailPost(null)}
-            />
           </View>
         </RNView>
       </Modal>
 
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName={getTenantSenderName()}
+        onClose={() => setSelectedDetailPost(null)}
+      />
     </SafeAreaView>
   );
 }

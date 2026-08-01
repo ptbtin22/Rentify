@@ -24,9 +24,10 @@ import { PostDetailModal } from './PostDetailModal';
 interface ProfileModalProps {
   visible: boolean;
   onClose: () => void;
+  onPostClick?: (post: Notice) => void;
 }
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, onPostClick }) => {
   const { currentRole } = useAuth();
   const { local, language } = useLanguage();
   const { adjustSize } = useElderlyMode();
@@ -99,7 +100,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
             keyExtractor={item => 'my-post-' + item.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.postCard} onPress={() => setSelectedPost(item)}>
+              <TouchableOpacity 
+                style={styles.postCard} 
+                onPress={() => {
+                  if (onPostClick) {
+                    onPostClick(item);
+                  } else {
+                    setSelectedPost(item);
+                  }
+                }}
+              >
                 <View style={styles.postHeader}>
                   <Text style={[styles.postTitle, { fontSize: adjustSize(13) }]}>{item.title}</Text>
                   <Text style={styles.postTime}>

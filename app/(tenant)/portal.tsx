@@ -29,9 +29,11 @@ import { useElderlyMode } from '../../services/AccessibilityManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
+import { PostDetailModal } from '../../components/PostDetailModal';
+import { Notice } from '../../services/NoticeRepository';
 
 export default function TenantPortal() {
-  const { local } = useLanguage();
+  const { local, language } = useLanguage();
   const router = useRouter();
   const { logout } = useAuth();
 
@@ -45,6 +47,7 @@ export default function TenantPortal() {
   const [isContractVisible, setIsContractVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const { adjustSize } = useElderlyMode();
 
@@ -557,11 +560,24 @@ export default function TenantPortal() {
       <ProfileModal
         visible={isProfileVisible}
         onClose={() => setIsProfileVisible(false)}
+        onPostClick={(item) => {
+          setIsProfileVisible(false);
+          setTimeout(() => {
+            setSelectedDetailPost(item);
+          }, 400);
+        }}
       />
 
       <SettingsModal
         visible={isSettingsVisible}
         onClose={() => setIsSettingsVisible(false)}
+      />
+
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName={language === 'vi' ? 'Cư dân - Phòng 102' : 'Resident - Room 102'}
+        onClose={() => setSelectedDetailPost(null)}
       />
 
       {/* ─── Contract Viewer Modal ─── */}

@@ -444,7 +444,12 @@ export default function LandlordNotices() {
               renderItem={({ item }) => (
                 <TouchableOpacity 
                   style={styles.posterPostCard}
-                  onPress={() => setSelectedDetailPost(item)}
+                  onPress={() => {
+                    setIsPosterProfileVisible(false);
+                    setTimeout(() => {
+                      setSelectedDetailPost(item);
+                    }, 400);
+                  }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
@@ -460,13 +465,6 @@ export default function LandlordNotices() {
                   {local('no_other_posts')}
                 </Text>
               }
-            />
-
-            <PostDetailModal
-              visible={selectedDetailPost !== null}
-              item={selectedDetailPost}
-              commenterName="Landlord"
-              onClose={() => setSelectedDetailPost(null)}
             />
           </View>
         </RNView>
@@ -571,6 +569,13 @@ export default function LandlordNotices() {
         visible={isFireConfirmVisible}
         onClose={() => setIsFireConfirmVisible(false)}
         onConfirm={submitNotice}
+      />
+
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName="Landlord"
+        onClose={() => setSelectedDetailPost(null)}
       />
     </SafeAreaView>
   );
