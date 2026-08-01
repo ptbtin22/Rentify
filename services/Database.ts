@@ -90,7 +90,7 @@ let properties: Property[] = [
     propertyType: 'House',
     rentAmount: 2500,
     bedrooms: 4,
-    bathrooms: 2.5,
+    bathrooms: 2,
     isOccupied: false,
     electricityRate: 4000,
     waterRate: 120000,

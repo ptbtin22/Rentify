@@ -79,7 +79,7 @@ export default function LandlordProperties() {
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
   const [rentAmount, setRentAmount] = useState('1500');
   const [bedrooms, setBedrooms] = useState(2);
-  const [bathrooms, setBathrooms] = useState(1.0);
+  const [bathrooms, setBathrooms] = useState(1);
   const [electricityRate, setElectricityRate] = useState('3500');
   const [waterRate, setWaterRate] = useState('100000');
   const [serviceFee, setServiceFee] = useState('50000');
@@ -547,17 +547,17 @@ export default function LandlordProperties() {
 
               {/* Bathroom Stepper */}
               <View style={styles.stepperRow}>
-                <Text style={styles.rowLabel}>Bathrooms: {bathrooms.toFixed(1)}</Text>
+                <Text style={styles.rowLabel}>Bathrooms: {bathrooms}</Text>
                 <View style={styles.stepperButtons}>
                   <TouchableOpacity
                     style={styles.stepperBtn}
-                    onPress={() => setBathrooms(Math.max(1, bathrooms - 0.5))}
+                    onPress={() => setBathrooms(Math.max(1, bathrooms - 1))}
                   >
                     <Text style={styles.stepperBtnText}>-</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.stepperBtn}
-                    onPress={() => setBathrooms(Math.min(10, bathrooms + 0.5))}
+                    onPress={() => setBathrooms(Math.min(10, bathrooms + 1))}
                   >
                     <Text style={styles.stepperBtnText}>+</Text>
                   </TouchableOpacity>
@@ -605,9 +605,9 @@ export default function LandlordProperties() {
                     <Text style={styles.detailLabel}>Bedrooms</Text>
                     <Text style={styles.detailValue}>{selectedProperty.bedrooms}</Text>
                   </View>
-                  <View style={styles.detailRow}>
+                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Bathrooms</Text>
-                    <Text style={styles.detailValue}>{selectedProperty.bathrooms.toFixed(1)}</Text>
+                    <Text style={styles.detailValue}>{selectedProperty.bathrooms}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Electricity Rate</Text>
