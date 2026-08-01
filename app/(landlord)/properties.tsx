@@ -42,6 +42,15 @@ export default function LandlordProperties() {
   const [newKhuName, setNewKhuName] = useState('');
   const [newKhuAddress, setNewKhuAddress] = useState('');
 
+  // Toast notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2500);
+  };
+
   // Filtering
   const [selectedKhuFilterId, setSelectedKhuFilterId] = useState<'all' | string>('all');
   
@@ -138,7 +147,8 @@ export default function LandlordProperties() {
     setNewKhuName('');
     setNewKhuAddress('');
     refreshData();
-    Alert.alert(local('complex_success_title'), local('complex_success_desc'));
+    setIsKhuModalVisible(false);
+    showToast(local('complex_success_desc'));
   };
 
   const handleDeleteKhu = (id: string) => {
@@ -608,6 +618,12 @@ export default function LandlordProperties() {
           </View>
         )}
       </Modal>
+
+      {toastMessage !== null && (
+        <View style={styles.toastContainer}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1009,5 +1025,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#FF3B30'
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    backgroundColor: '#323232',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
+    zIndex: 9999
+  },
+  toastText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center'
   }
 });
