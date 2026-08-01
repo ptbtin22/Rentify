@@ -607,8 +607,8 @@ const styles = StyleSheet.create({
   },
   modalCancel: {
     fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '500'
+    color: '#007AFF',
+    fontWeight: '600'
   },
   modalTitle: {
     fontSize: 17,
