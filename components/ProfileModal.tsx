@@ -43,8 +43,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
     ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
     : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
 
-  const themeColor = currentRole === 'landlord' ? '#007AFF' : '#34C759';
-
   const loadMyNotices = () => {
     const allNotices = NoticeRepository.getNotices();
     const sender = currentRole === 'landlord' ? 'Landlord' : 'Tenant';
