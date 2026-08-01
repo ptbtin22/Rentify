@@ -411,16 +411,17 @@ export default function TenantNotices() {
                 </Text>
               }
             />
+
+            <PostDetailModal
+              visible={selectedDetailPost !== null}
+              item={selectedDetailPost}
+              commenterName={getTenantSenderName()}
+              onClose={() => setSelectedDetailPost(null)}
+            />
           </View>
         </RNView>
       </Modal>
 
-      <PostDetailModal
-        visible={selectedDetailPost !== null}
-        item={selectedDetailPost}
-        commenterName={getTenantSenderName()}
-        onClose={() => setSelectedDetailPost(null)}
-      />
     </SafeAreaView>
   );
 }

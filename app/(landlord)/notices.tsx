@@ -461,6 +461,13 @@ export default function LandlordNotices() {
                 </Text>
               }
             />
+
+            <PostDetailModal
+              visible={selectedDetailPost !== null}
+              item={selectedDetailPost}
+              commenterName="Landlord"
+              onClose={() => setSelectedDetailPost(null)}
+            />
           </View>
         </RNView>
       </Modal>
@@ -564,13 +571,6 @@ export default function LandlordNotices() {
         visible={isFireConfirmVisible}
         onClose={() => setIsFireConfirmVisible(false)}
         onConfirm={submitNotice}
-      />
-
-      <PostDetailModal
-        visible={selectedDetailPost !== null}
-        item={selectedDetailPost}
-        commenterName="Landlord"
-        onClose={() => setSelectedDetailPost(null)}
       />
     </SafeAreaView>
   );
