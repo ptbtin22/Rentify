@@ -312,7 +312,7 @@ export default function LandlordProperties() {
               <View style={{ width: 50 }} />
             </View>
 
-            <ScrollView style={styles.formScroll}>
+            <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
               
               {/* Add Khu Form */}
               <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('add_complex')}</Text>
@@ -389,7 +389,7 @@ export default function LandlordProperties() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.formScroll}>
+            <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
               {/* Parent Khu selector (Dropdown) */}
               <Text style={styles.label}>{local('select_complex_label')}</Text>
               <View style={styles.dropdownContainer}>
@@ -586,7 +586,7 @@ export default function LandlordProperties() {
                 <View style={{ width: 50 }} />
               </View>
 
-              <ScrollView style={styles.formScroll}>
+              <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
                 <Text style={styles.label}>Details</Text>
                 <View style={styles.detailContainer}>
                   <View style={styles.detailRow}>
