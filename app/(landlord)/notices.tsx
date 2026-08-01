@@ -32,6 +32,7 @@ import { Database } from '../../services/Database';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'react-native';
+import { PostDetailModal } from '../../components/PostDetailModal';
 
 export default function LandlordNotices() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function LandlordNotices() {
   const [composeTitle, setComposeTitle] = useState('');
   const insets = useSafeAreaInsets();
   const [composeMediaUri, setComposeMediaUri] = useState('');
+  const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   
   const canSend = composeTitle.trim() || composeBody.trim();
 
@@ -440,7 +442,10 @@ export default function LandlordNotices() {
               keyExtractor={item => 'post-' + item.id}
               style={{ marginTop: 8, maxHeight: '60%' }}
               renderItem={({ item }) => (
-                <View style={styles.posterPostCard}>
+                <TouchableOpacity 
+                  style={styles.posterPostCard}
+                  onPress={() => setSelectedDetailPost(item)}
+                >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
                     <Text style={styles.posterPostTime}>
@@ -448,7 +453,7 @@ export default function LandlordNotices() {
                     </Text>
                   </View>
                   <Text style={styles.posterPostBody} numberOfLines={2}>{item.body}</Text>
-                </View>
+                </TouchableOpacity>
               )}
               ListEmptyComponent={
                 <Text style={{ color: '#8E8E93', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginTop: 20 }}>
@@ -559,6 +564,13 @@ export default function LandlordNotices() {
         visible={isFireConfirmVisible}
         onClose={() => setIsFireConfirmVisible(false)}
         onConfirm={submitNotice}
+      />
+
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName="Landlord"
+        onClose={() => setSelectedDetailPost(null)}
       />
     </SafeAreaView>
   );

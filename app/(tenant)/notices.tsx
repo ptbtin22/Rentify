@@ -31,6 +31,7 @@ import { useAuth } from '../../services/AuthManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { NotificationManager } from '../../services/NotificationManager';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
+import { PostDetailModal } from '../../components/PostDetailModal';
 
 export default function TenantNotices() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function TenantNotices() {
 
   // Tenant Post Compose States
   const [isComposeVisible, setIsComposeVisible] = useState(false);
+  const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [composeTitle, setComposeTitle] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeType, setComposeType] = useState<NoticeType>('info');
@@ -390,7 +392,10 @@ export default function TenantNotices() {
               keyExtractor={item => 'post-' + item.id}
               style={{ marginTop: 8, maxHeight: '60%' }}
               renderItem={({ item }) => (
-                <View style={styles.posterPostCard}>
+                <TouchableOpacity 
+                  style={styles.posterPostCard}
+                  onPress={() => setSelectedDetailPost(item)}
+                >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
                     <Text style={styles.posterPostTime}>
@@ -398,7 +403,7 @@ export default function TenantNotices() {
                     </Text>
                   </View>
                   <Text style={styles.posterPostBody} numberOfLines={2}>{item.body}</Text>
-                </View>
+                </TouchableOpacity>
               )}
               ListEmptyComponent={
                 <Text style={{ color: '#8E8E93', fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginTop: 20 }}>
@@ -409,6 +414,13 @@ export default function TenantNotices() {
           </View>
         </RNView>
       </Modal>
+
+      <PostDetailModal
+        visible={selectedDetailPost !== null}
+        item={selectedDetailPost}
+        commenterName={getTenantSenderName()}
+        onClose={() => setSelectedDetailPost(null)}
+      />
     </SafeAreaView>
   );
 }
