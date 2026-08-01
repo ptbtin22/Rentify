@@ -203,33 +203,37 @@ export default function LandlordNotices() {
           return (
             <View style={styles.moderatorSection}>
               <Text style={[styles.moderatorTitle, { fontSize: adjustSize(15) }]}>{local('notices_approval_requests')} ({pendingNotices.length})</Text>
-              {pendingNotices.map(item => (
-                <View key={item.id} style={styles.pendingCard}>
-                  <View style={styles.pendingHeader}>
-                    <Text style={[styles.pendingAuthor, { fontSize: adjustSize(12) }]}>👤 {item.senderName === 'Tenant' ? local('tenant') : item.senderName}</Text>
-                    <Text style={styles.pendingTime}>
-                      {new Date(item.createdAt).toLocaleDateString()}
-                    </Text>
+              {pendingNotices.map((item, index) => (
+                <View key={item.id}>
+                  <View style={styles.pendingCard}>
+                    <View style={styles.pendingHeader}>
+                      <Text style={[styles.pendingAuthor, { fontSize: adjustSize(12) }]}>👤 {item.senderName === 'Tenant' ? local('tenant') : item.senderName}</Text>
+                      <Text style={styles.pendingTime}>
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text style={[styles.pendingPostTitle, { fontSize: adjustSize(13) }]}>{item.title}</Text>
+                    <Text style={[styles.pendingBody, { fontSize: adjustSize(12) }]} numberOfLines={2}>{item.body}</Text>
+                    <View style={styles.pendingActions}>
+                      <TouchableOpacity 
+                        style={styles.approveBtn} 
+                        onPress={() => NoticeRepository.approveNotice(item.id)}
+                      >
+                        <Text style={styles.approveBtnText}>{local('approve')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.rejectBtn} 
+                        onPress={() => NoticeRepository.deleteNotice(item.id)}
+                      >
+                        <Text style={styles.rejectBtnText}>{local('reject')}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <Text style={[styles.pendingPostTitle, { fontSize: adjustSize(13) }]}>{item.title}</Text>
-                  <Text style={[styles.pendingBody, { fontSize: adjustSize(12) }]} numberOfLines={2}>{item.body}</Text>
-                  <View style={styles.pendingActions}>
-                    <TouchableOpacity 
-                      style={styles.approveBtn} 
-                      onPress={() => NoticeRepository.approveNotice(item.id)}
-                    >
-                      <Text style={styles.approveBtnText}>{local('approve')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.rejectBtn} 
-                      onPress={() => NoticeRepository.deleteNotice(item.id)}
-                    >
-                      <Text style={styles.rejectBtnText}>{local('reject')}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {index < pendingNotices.length - 1 && (
+                    <View style={[styles.moderatorDivider, { marginVertical: 8 }]} />
+                  )}
                 </View>
               ))}
-              <View style={styles.moderatorDivider} />
             </View>
           );
         }}
