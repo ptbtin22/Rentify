@@ -40,45 +40,36 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent
+      presentationStyle="pageSheet"
+      transparent={false}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.modalCancel}>{local('close')}</Text>
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { fontSize: adjustSize(16) }]}>{local('post_details')}</Text>
-            <View style={{ width: 50 }} />
-          </View>
-
-          <ScrollView style={styles.modalScroll}>
-            <FacebookPostCard
-              item={item}
-              commenterName={commenterName}
-              onPosterClick={() => {}}
-            />
-          </ScrollView>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalCancel}>{local('close')}</Text>
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { fontSize: adjustSize(16) }]}>{local('post_details')}</Text>
+          <View style={{ width: 50 }} />
         </View>
-      </View>
+
+        <ScrollView style={styles.modalScroll}>
+          <FacebookPostCard
+            item={item}
+            commenterName={commenterName}
+            onPosterClick={() => {}}
+          />
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end'
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '85%'
+    backgroundColor: '#FFF'
   },
   modalHeader: {
     height: 56,
@@ -99,6 +90,7 @@ const styles = StyleSheet.create({
     color: '#1C1C1E'
   },
   modalScroll: {
-    padding: 16
+    padding: 16,
+    backgroundColor: '#FFF'
   }
 });
