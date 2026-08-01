@@ -10,9 +10,10 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
-  ScrollView
+  ScrollView,
+  Platform
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Notice } from '../services/NoticeRepository';
 import { useLanguage } from '../services/LanguageManager';
 import { useElderlyMode } from '../services/AccessibilityManager';
@@ -33,6 +34,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
 }) => {
   const { local } = useLanguage();
   const { adjustSize } = useElderlyMode();
+  const insets = useSafeAreaInsets();
 
   if (!item) return null;
 
@@ -44,7 +46,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 12 : Math.max(insets.top, 12) }]}>
         {/* Header */}
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose}>
@@ -61,7 +63,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
             onPosterClick={() => {}}
           />
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
