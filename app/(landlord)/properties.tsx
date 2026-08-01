@@ -221,8 +221,12 @@ export default function LandlordProperties() {
           >
             <Text style={[styles.khuManageText, { fontSize: adjustSize(16) }]}>⚙️</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addBtnHeader} onPress={() => setIsAddVisible(true)}>
-            <Text style={[styles.addText, { fontSize: adjustSize(13), color: '#007AFF' }]}>➕ {local('add_room') || 'Add Room'}</Text>
+          <TouchableOpacity 
+            style={styles.addBtnHeader} 
+            onPress={() => setIsAddVisible(true)}
+            accessibilityLabel={local('add_room') || 'Add Room'}
+          >
+            <Text style={[styles.addText, { fontSize: adjustSize(16) }]}>➕</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -714,8 +718,7 @@ const styles = StyleSheet.create({
   },
   addText: {
     color: '#007AFF',
-    fontSize: 15,
-    fontWeight: '700'
+    fontSize: 16
   },
   listContent: {
     padding: 16,
@@ -1000,11 +1003,10 @@ const styles = StyleSheet.create({
     fontSize: 16
   },
   addBtnHeader: {
+    width: 36,
     height: 36,
-    paddingHorizontal: 12,
-    backgroundColor: '#007AFF1A',
     borderRadius: 18,
-    flexDirection: 'row',
+    backgroundColor: '#007AFF1A',
     alignItems: 'center',
     justifyContent: 'center'
   },
