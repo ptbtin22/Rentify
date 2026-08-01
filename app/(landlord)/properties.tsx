@@ -5,7 +5,7 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
