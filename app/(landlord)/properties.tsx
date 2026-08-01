@@ -45,7 +45,7 @@ export default function LandlordProperties() {
   // Filtering
   const [selectedKhuFilterId, setSelectedKhuFilterId] = useState<'all' | string>('all');
   
-  const { local } = useLanguage();
+  const { local, language } = useLanguage();
   const { isElderly, adjustSize } = useElderlyMode();
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
   const [rentAmount, setRentAmount] = useState('1500');
@@ -127,10 +127,17 @@ export default function LandlordProperties() {
   };
 
   const handleSaveKhu = () => {
-    if (!newKhuName.trim() || !newKhuAddress.trim()) return;
-    Database.addKhuTro(newKhuName, newKhuAddress);
+    if (!newKhuName.trim() || !newKhuAddress.trim()) {
+      Alert.alert(
+        language === 'vi' ? 'Yêu cầu' : 'Required',
+        language === 'vi' ? 'Vui lòng điền đầy đủ cả hai trường tên và địa chỉ.' : 'Both fields (complex name and address) are required.'
+      );
+      return;
+    }
+    Database.addKhuTro(newKhuName.trim(), newKhuAddress.trim());
     setNewKhuName('');
     setNewKhuAddress('');
+    refreshData();
     Alert.alert(local('complex_success_title'), local('complex_success_desc'));
   };
 
