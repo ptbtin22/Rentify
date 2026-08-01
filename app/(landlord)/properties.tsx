@@ -43,6 +43,9 @@ export default function LandlordProperties() {
   const [newKhuName, setNewKhuName] = useState('');
   const [newKhuAddress, setNewKhuAddress] = useState('');
 
+  // Dropdown states
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   // Toast notification with slide up / slide down transitions
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -387,29 +390,46 @@ export default function LandlordProperties() {
             </View>
 
             <ScrollView style={styles.formScroll}>
-              {/* Parent Khu selector */}
+              {/* Parent Khu selector (Dropdown) */}
               <Text style={styles.label}>{local('select_complex_label')}</Text>
-              <View style={styles.segmentedContainer}>
-                {khuTros.map(k => (
-                  <TouchableOpacity
-                    key={k.id}
-                    style={[
-                      styles.segmentButton,
-                      selectedKhuTroId === k.id && { backgroundColor: '#007AFF' }
-                    ]}
-                    onPress={() => setSelectedKhuTroId(k.id)}
-                  >
-                    <Text
+              
+              <TouchableOpacity 
+                style={styles.dropdownTrigger} 
+                onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <Text style={styles.dropdownTriggerText}>
+                  {khuTros.find(k => k.id === selectedKhuTroId)?.name || 'Select Complex'}
+                </Text>
+                <Text style={styles.dropdownChevron}>{isDropdownOpen ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {isDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  {khuTros.map(k => (
+                    <TouchableOpacity
+                      key={k.id}
                       style={[
-                        styles.segmentText,
-                        selectedKhuTroId === k.id && { color: '#FFF', fontWeight: '700' }
+                        styles.dropdownItem,
+                        selectedKhuTroId === k.id && styles.dropdownItemActive
                       ]}
+                      onPress={() => {
+                        setSelectedKhuTroId(k.id);
+                        setIsDropdownOpen(false);
+                      }}
                     >
-                      {k.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selectedKhuTroId === k.id && styles.dropdownItemTextActive
+                      ]}>
+                        {k.name}
+                      </Text>
+                      {selectedKhuTroId === k.id && (
+                        <Text style={styles.checkIcon}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               <Text style={styles.label}>General Information</Text>
               
@@ -1081,5 +1101,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center'
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 48,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12
+  },
+  dropdownTriggerText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E'
+  },
+  dropdownChevron: {
+    fontSize: 12,
+    color: '#8E8E93'
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 16,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8
+  },
+  dropdownItemActive: {
+    backgroundColor: '#007AFF10'
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#1C1C1E'
+  },
+  dropdownItemTextActive: {
+    color: '#007AFF',
+    fontWeight: '700'
+  },
+  checkIcon: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '700'
   }
 });
