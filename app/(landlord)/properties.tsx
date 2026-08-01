@@ -214,8 +214,12 @@ export default function LandlordProperties() {
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('properties') || 'Properties'}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.khuManageBtn} onPress={() => setIsKhuModalVisible(true)}>
-            <Text style={[styles.khuManageText, { fontSize: adjustSize(13) }]}>⚙️ {local('manage_complexes')}</Text>
+          <TouchableOpacity 
+            style={styles.khuManageBtn} 
+            onPress={() => setIsKhuModalVisible(true)}
+            accessibilityLabel={local('manage_complexes')}
+          >
+            <Text style={[styles.khuManageText, { fontSize: adjustSize(16) }]}>⚙️</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtnHeader} onPress={() => setIsAddVisible(true)}>
             <Text style={[styles.addText, { fontSize: adjustSize(13), color: '#007AFF' }]}>➕ {local('add_room') || 'Add Room'}</Text>
@@ -985,21 +989,24 @@ const styles = StyleSheet.create({
     gap: 12
   },
   khuManageBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F2F2F7',
-    borderRadius: 10
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   khuManageText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8E8E93'
+    fontSize: 16
   },
   addBtnHeader: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    height: 36,
+    paddingHorizontal: 12,
     backgroundColor: '#007AFF1A',
-    borderRadius: 10
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   // Switcher styles
   switcherContainer: {
