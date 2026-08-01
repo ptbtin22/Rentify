@@ -372,7 +372,7 @@ export default function TenantNotices() {
                   {selectedPosterName === 'Landlord' ? '🏡' : '👤'}
                 </Text>
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, gap: 5 }}>
                 <Text style={styles.posterName}>
                   {selectedPosterName === 'Landlord' ? local('landlord') : local('tenant')}
                 </Text>
@@ -632,8 +632,7 @@ const styles = StyleSheet.create({
   posterContact: {
     fontSize: 12,
     color: '#2C2C2E',
-    fontWeight: '500',
-    marginTop: 4
+    fontWeight: '500'
   },
   posterSectionTitle: {
     fontSize: 12,

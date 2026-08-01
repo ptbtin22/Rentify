@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    gap: 2
+    gap: 5
   },
   profileName: {
     fontWeight: '800',
@@ -185,8 +185,7 @@ const styles = StyleSheet.create({
   },
   profileDetails: {
     color: '#2C2C2E',
-    fontWeight: '500',
-    marginTop: 2
+    fontWeight: '500'
   },
   sectionLabel: {
     fontWeight: '700',
