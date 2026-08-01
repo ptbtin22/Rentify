@@ -392,44 +392,51 @@ export default function LandlordProperties() {
             <ScrollView style={styles.formScroll}>
               {/* Parent Khu selector (Dropdown) */}
               <Text style={styles.label}>{local('select_complex_label')}</Text>
-              
-              <TouchableOpacity 
-                style={styles.dropdownTrigger} 
-                onPress={() => setIsDropdownOpen(!isDropdownOpen)}
-              >
-                <Text style={styles.dropdownTriggerText}>
-                  {khuTros.find(k => k.id === selectedKhuTroId)?.name || 'Select Complex'}
-                </Text>
-                <Text style={styles.dropdownChevron}>{isDropdownOpen ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
+              <View style={styles.dropdownContainer}>
+                <TouchableOpacity 
+                  style={styles.dropdownTrigger} 
+                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  <Text style={styles.dropdownTriggerText}>
+                    {khuTros.find(k => k.id === selectedKhuTroId)?.name || 'Select Complex'}
+                  </Text>
+                  <Text style={styles.dropdownChevron}>{isDropdownOpen ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
 
-              {isDropdownOpen && (
-                <View style={styles.dropdownMenu}>
-                  {khuTros.map(k => (
-                    <TouchableOpacity
-                      key={k.id}
-                      style={[
-                        styles.dropdownItem,
-                        selectedKhuTroId === k.id && styles.dropdownItemActive
-                      ]}
-                      onPress={() => {
-                        setSelectedKhuTroId(k.id);
-                        setIsDropdownOpen(false);
-                      }}
+                {isDropdownOpen && (
+                  <View style={styles.dropdownMenu}>
+                    <ScrollView 
+                      style={{ maxHeight: 150 }} 
+                      nestedScrollEnabled
+                      contentContainerStyle={{ paddingVertical: 4 }}
                     >
-                      <Text style={[
-                        styles.dropdownItemText,
-                        selectedKhuTroId === k.id && styles.dropdownItemTextActive
-                      ]}>
-                        {k.name}
-                      </Text>
-                      {selectedKhuTroId === k.id && (
-                        <Text style={styles.checkIcon}>✓</Text>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                      {khuTros.map(k => (
+                        <TouchableOpacity
+                          key={k.id}
+                          style={[
+                            styles.dropdownItem,
+                            selectedKhuTroId === k.id && styles.dropdownItemActive
+                          ]}
+                          onPress={() => {
+                            setSelectedKhuTroId(k.id);
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dropdownItemText,
+                            selectedKhuTroId === k.id && styles.dropdownItemTextActive
+                          ]}>
+                            {k.name}
+                          </Text>
+                          {selectedKhuTroId === k.id && (
+                            <Text style={styles.checkIcon}>✓</Text>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
 
               <Text style={styles.label}>General Information</Text>
               
@@ -1102,6 +1109,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center'
   },
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 1000,
+    marginBottom: 12
+  },
   dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1109,8 +1121,7 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: '#F2F2F7',
     borderRadius: 10,
-    paddingHorizontal: 16,
-    marginBottom: 12
+    paddingHorizontal: 16
   },
   dropdownTriggerText: {
     fontSize: 15,
@@ -1122,18 +1133,22 @@ const styles = StyleSheet.create({
     color: '#8E8E93'
   },
   dropdownMenu: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
     backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: '#E5E5EA',
     borderRadius: 10,
     padding: 4,
-    marginBottom: 16,
-    maxHeight: 200,
+    maxHeight: 160,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    zIndex: 2000
   },
   dropdownItem: {
     flexDirection: 'row',
