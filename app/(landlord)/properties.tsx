@@ -5,7 +5,7 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,7 +15,8 @@ import {
   Modal,
   TextInput,
   Alert,
-  ScrollView
+  ScrollView,
+  Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../services/Database';
@@ -42,12 +43,28 @@ export default function LandlordProperties() {
   const [newKhuName, setNewKhuName] = useState('');
   const [newKhuAddress, setNewKhuAddress] = useState('');
 
-  // Toast notification
+  // Toast notification with slide up / slide down transitions
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    // Slide up and fade in
+    Animated.timing(toastAnim, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+
+    // Slide down and fade out after 2.5 seconds
     setTimeout(() => {
-      setToastMessage(null);
+      Animated.timing(toastAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastMessage(null);
+      });
     }, 2500);
   };
 
@@ -620,9 +637,24 @@ export default function LandlordProperties() {
       </Modal>
 
       {toastMessage !== null && (
-        <View style={styles.toastContainer}>
+        <Animated.View 
+          style={[
+            styles.toastContainer,
+            {
+              opacity: toastAnim,
+              transform: [
+                {
+                  translateY: toastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [60, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
           <Text style={styles.toastText}>{toastMessage}</Text>
-        </View>
+        </Animated.View>
       )}
     </SafeAreaView>
   );
