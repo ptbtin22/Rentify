@@ -67,7 +67,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
       transparent={false}
       onRequestClose={onClose}
     >
-      <RNView style={[styles.container, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 36 : 16) }]}>
+      <RNView style={[styles.container, { paddingTop: Platform.OS === 'ios' ? 12 : Math.max(insets.top, 12) }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
