@@ -585,7 +585,7 @@ export default function LandlordProperties() {
       >
         {selectedProperty && (
           <View style={styles.modalOverlay}>
-            <SafeAreaView style={styles.modalContent}>
+            <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setSelectedProperty(null)}>
                   <Text style={styles.modalCancel}>Close</Text>
@@ -666,7 +666,7 @@ export default function LandlordProperties() {
                   <Text style={styles.deleteBtnText}>Delete Property</Text>
                 </TouchableOpacity>
               </ScrollView>
-            </SafeAreaView>
+            </View>
           </View>
         )}
       </Modal>

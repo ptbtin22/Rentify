@@ -336,7 +336,7 @@ export default function TenantPortal() {
       {/* ─── Meter reading, OCR extraction & QR pay flow ─── */}
       <Modal visible={isMeterModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
             
             {/* Header */}
             <View style={styles.modalHeader}>
@@ -553,7 +553,7 @@ export default function TenantPortal() {
               </View>
             )}
 
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
 
@@ -583,7 +583,7 @@ export default function TenantPortal() {
       {/* ─── Contract Viewer Modal ─── */}
       <Modal visible={isContractVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsContractVisible(false)}>
                 <Text style={styles.modalCancel}>Close</Text>
@@ -611,7 +611,7 @@ export default function TenantPortal() {
                 </View>
               </View>
             </ScrollView>
-          </SafeAreaView>
+            </View>
         </View>
       </Modal>
     </SafeAreaView>

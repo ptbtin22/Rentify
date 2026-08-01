@@ -159,7 +159,7 @@ export default function LandlordTenants() {
       {/* Add Tenant Modal */}
       <Modal visible={isAddVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsAddVisible(false)}>
                 <Text style={styles.modalCancel}>Cancel</Text>
@@ -225,7 +225,7 @@ export default function LandlordTenants() {
                 />
               </View>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
 
@@ -233,7 +233,7 @@ export default function LandlordTenants() {
       <Modal visible={selectedTenant !== null} animationType="slide" transparent>
         {selectedTenant && (
           <View style={styles.modalOverlay}>
-            <SafeAreaView style={styles.modalContent}>
+            <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setSelectedTenant(null)}>
                   <Text style={styles.modalCancel}>Close</Text>
@@ -301,7 +301,7 @@ export default function LandlordTenants() {
                   <Text style={styles.deleteBtnText}>Delete Tenant</Text>
                 </TouchableOpacity>
               </ScrollView>
-            </SafeAreaView>
+            </View>
           </View>
         )}
       </Modal>

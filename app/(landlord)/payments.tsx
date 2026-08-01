@@ -322,7 +322,7 @@ export default function LandlordPayments() {
       {/* ─── New Lease Modal ─── */}
       <Modal visible={isAddLeaseVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => { closeAllPickers(); setIsAddLeaseVisible(false); }}>
@@ -498,7 +498,7 @@ export default function LandlordPayments() {
 
                 {/* Bottom spacer — already handled by paddingBottom on contentContainerStyle */}
               </ScrollView>
-          </SafeAreaView>
+          </View>
 
           {/* ── Simulated Camera Viewfinder Modal (Nested to render on top on iOS) ── */}
           <Modal visible={isCameraVisible} animationType="slide" transparent>

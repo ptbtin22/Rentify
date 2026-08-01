@@ -312,7 +312,7 @@ export default function LandlordDashboard() {
       {/* ─── Premium Revenue Report Modal ─── */}
       <Modal visible={isReportVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsReportVisible(false)}>
                 <Text style={styles.modalCancel}>Close</Text>
@@ -379,7 +379,7 @@ export default function LandlordDashboard() {
                 </Text>
               </View>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
 
