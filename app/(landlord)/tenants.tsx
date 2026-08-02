@@ -21,9 +21,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
+import { useRouter } from 'expo-router';
 
 export default function LandlordTenants() {
   const { local } = useLanguage();
+  const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
@@ -292,6 +294,21 @@ export default function LandlordTenants() {
                       </View>
                     ))}
                   </View>
+                )}
+
+                {getTenantLeases(selectedTenant.id).length === 0 && (
+                  <TouchableOpacity
+                    style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12 }]}
+                    onPress={() => {
+                      setSelectedTenant(null);
+                      router.replace({
+                        pathname: '/(landlord)/payments',
+                        params: { openNewLease: 'true', tenantId: selectedTenant.id }
+                      });
+                    }}
+                  >
+                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>🔑 Assign to Room / Create Lease</Text>
+                  </TouchableOpacity>
                 )}
 
                 <TouchableOpacity

@@ -28,6 +28,9 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../../services/Database';
+import { useLanguage } from '../../services/LanguageManager';
+import { useElderlyMode } from '../../services/AccessibilityManager';
+import { BillingConfigModal } from '../../components/BillingConfigModal';
 
 // Helper: format Date → "YYYY-MM-DD" string for storage
 const formatDate = (date: Date): string => {
@@ -47,6 +50,9 @@ if (Platform.OS === 'android') {
 }
 
 export default function LandlordPayments() {
+  const { local } = useLanguage();
+  const { adjustSize } = useElderlyMode();
+  const [isConfigVisible, setIsConfigVisible] = useState(false);
   const params = useLocalSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -63,8 +69,14 @@ export default function LandlordPayments() {
   useEffect(() => {
     if (params.openNewLease === 'true') {
       setIsAddLeaseVisible(true);
+      if (params.propertyId) {
+        setSelectedPropertyId(params.propertyId as string);
+      }
+      if (params.tenantId) {
+        setSelectedTenantId(params.tenantId as string);
+      }
     }
-  }, [params.openNewLease]);
+  }, [params.openNewLease, params.propertyId, params.tenantId]);
 
   // Form state — dates stored as Date objects
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
@@ -208,6 +220,26 @@ export default function LandlordPayments() {
     Alert.alert('Lease Agreement Saved', 'Lease has been activated. Invoices were generated.');
   };
 
+  const handleSendManualReminder = (pay: Payment) => {
+    const info = getPaymentDisplayData(pay);
+    Alert.alert(
+      'Send Invoice Reminder',
+      `Send rent invoice reminder for ${info.propertyName} (Tenant: ${info.tenantName}) via Zalo & Push?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Send', 
+          onPress: () => {
+            Alert.alert(
+              'Reminder Sent',
+              `Manual reminder successfully sent to ${info.tenantName} for payment amount of $${info.amount.toLocaleString()}.`
+            );
+          } 
+        }
+      ]
+    );
+  };
+
   const closeAllPickers = () => {
     closePicker(startPickerAnim, () => setStartMounted(false));
     closePicker(endPickerAnim,   () => setEndMounted(false));
@@ -254,10 +286,23 @@ export default function LandlordPayments() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Payments & Leases</Text>
-        <TouchableOpacity onPress={() => setIsAddLeaseVisible(true)}>
-          <Text style={styles.addText}>📝 New Lease</Text>
-        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Payments & Leases</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.configActionBtn} 
+            onPress={() => setIsConfigVisible(true)}
+            accessibilityLabel="Billing Configuration"
+          >
+            <Text style={[styles.configActionText, { fontSize: adjustSize(16) }]}>⚙️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.addBtnHeader} 
+            onPress={() => setIsAddLeaseVisible(true)}
+            accessibilityLabel="New Lease"
+          >
+            <Text style={[styles.addText, { fontSize: adjustSize(16) }]}>➕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Filter Tabs */}
@@ -299,20 +344,32 @@ export default function LandlordPayments() {
               </View>
               <View style={styles.values}>
                 <Text style={styles.amount}>${info.amount.toLocaleString()}</Text>
-                {item.status !== 'Paid' ? (
-                  <TouchableOpacity
-                    style={[styles.statusBadge, { backgroundColor: colors.bg }]}
-                    onPress={() => handleRecordPaid(item.id)}
-                  >
-                    <Text style={[styles.statusText, { color: colors.text }]}>
-                      {item.status} (Tap to pay)
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
-                    <Text style={[styles.statusText, { color: colors.text }]}>{item.status}</Text>
-                  </View>
-                )}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  {item.status !== 'Paid' ? (
+                    <TouchableOpacity
+                      style={[styles.statusBadge, { backgroundColor: colors.bg }]}
+                      onPress={() => handleRecordPaid(item.id)}
+                    >
+                      <Text style={[styles.statusText, { color: colors.text }]}>
+                        {item.status} (Tap to pay)
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
+                      <Text style={[styles.statusText, { color: colors.text }]}>
+                        {item.status}
+                      </Text>
+                    </View>
+                  )}
+                  {item.status !== 'Paid' && (
+                    <TouchableOpacity
+                      style={styles.remindBtn}
+                      onPress={() => handleSendManualReminder(item)}
+                    >
+                      <Text style={styles.remindBtnText}>🔔 Remind</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
           );
@@ -545,6 +602,11 @@ export default function LandlordPayments() {
           </Modal>
         </View>
       </Modal>
+
+      <BillingConfigModal
+        visible={isConfigVisible}
+        onClose={() => setIsConfigVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -570,7 +632,43 @@ const styles = StyleSheet.create({
   },
   addText: {
     color: '#007AFF',
-    fontSize: 15,
+    fontSize: 16
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  configActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  configActionText: {
+    fontSize: 16
+  },
+  addBtnHeader: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#007AFF1A',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  remindBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#FF95001A',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  remindBtnText: {
+    color: '#FF9500',
+    fontSize: 12,
     fontWeight: '700'
   },
   filterRow: {

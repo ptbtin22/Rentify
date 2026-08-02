@@ -22,8 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useRouter } from 'expo-router';
 
 export default function LandlordProperties() {
+  const router = useRouter();
   const [properties, setProperties] = useState<Property[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -42,6 +44,8 @@ export default function LandlordProperties() {
   // Form Fields for Khu
   const [newKhuName, setNewKhuName] = useState('');
   const [newKhuAddress, setNewKhuAddress] = useState('');
+  const [newKhuRemindDay, setNewKhuRemindDay] = useState('');
+  const [roomRemindDay, setRoomRemindDay] = useState('');
 
   // Dropdown states
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -111,6 +115,7 @@ export default function LandlordProperties() {
   const handleSave = () => {
     if (!name.trim() || !address.trim() || isNaN(Number(rentAmount))) return;
 
+    const remindDayNum = Number(roomRemindDay);
     Database.addProperty({
       name,
       khuTroId: selectedKhuTroId,
@@ -121,7 +126,8 @@ export default function LandlordProperties() {
       bathrooms,
       electricityRate: Number(electricityRate),
       waterRate: Number(waterRate),
-      serviceFee: Number(serviceFee)
+      serviceFee: Number(serviceFee),
+      remindDay: remindDayNum > 0 && remindDayNum <= 28 ? remindDayNum : undefined
     });
 
     // Reset Form
@@ -130,10 +136,11 @@ export default function LandlordProperties() {
     setPropertyType('Apartment');
     setRentAmount('1500');
     setBedrooms(2);
-    setBathrooms(1.0);
+    setBathrooms(1);
     setElectricityRate('3500');
     setWaterRate('100000');
     setServiceFee('50000');
+    setRoomRemindDay('');
     setIsAddVisible(false);
   };
 
@@ -163,9 +170,15 @@ export default function LandlordProperties() {
       );
       return;
     }
-    Database.addKhuTro(newKhuName.trim(), newKhuAddress.trim());
+    const remindDayNum = Number(newKhuRemindDay);
+    Database.addKhuTro(
+      newKhuName.trim(), 
+      newKhuAddress.trim(), 
+      remindDayNum > 0 && remindDayNum <= 28 ? remindDayNum : undefined
+    );
     setNewKhuName('');
     setNewKhuAddress('');
+    setNewKhuRemindDay('');
     refreshData();
     setIsKhuModalVisible(false);
     showToast(local('complex_success_desc'));
@@ -342,6 +355,17 @@ export default function LandlordProperties() {
                   onChangeText={setNewKhuAddress}
                 />
               </View>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={[styles.textInput, { fontSize: adjustSize(15) }]}
+                  placeholder="Ngày nhắc phí khu trọ (1-28, optional)"
+                  placeholderTextColor="#8E8E93"
+                  value={newKhuRemindDay}
+                  onChangeText={setNewKhuRemindDay}
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+              </View>
               <TouchableOpacity style={styles.addKhuSubmitBtn} onPress={handleSaveKhu}>
                 <Text style={[styles.addKhuSubmitText, { fontSize: adjustSize(14) }]}>{local('add_complex')}</Text>
               </TouchableOpacity>
@@ -361,6 +385,11 @@ export default function LandlordProperties() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.khuListName}>{k.name}</Text>
                         <Text style={styles.khuListAddr}>{k.address}</Text>
+                        {k.remindDay !== undefined && (
+                          <Text style={[styles.khuListAddr, { color: '#007AFF', fontWeight: '600', marginTop: 2 }]}>
+                            📅 Ngày nhắc: Ngày {k.remindDay} hàng tháng
+                          </Text>
+                        )}
                       </View>
                       <TouchableOpacity style={styles.khuListDeleteBtn} onPress={() => handleDeleteKhu(k.id)}>
                         <Text style={[styles.khuListDeleteText, { fontSize: adjustSize(12) }]}>{local('delete')}</Text>
@@ -534,6 +563,17 @@ export default function LandlordProperties() {
                 />
               </View>
 
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>Remind Day (1-28, optional)</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={roomRemindDay}
+                  onChangeText={setRoomRemindDay}
+                  maxLength={2}
+                />
+              </View>
+
               {/* Bedroom Stepper */}
               <View style={styles.stepperRow}>
                 <Text style={styles.rowLabel}>Bedrooms: {bedrooms}</Text>
@@ -629,6 +669,12 @@ export default function LandlordProperties() {
                     <Text style={styles.detailLabel}>Service Fee</Text>
                     <Text style={styles.detailValue}>${selectedProperty.serviceFee?.toLocaleString() || '50,000'}/mo</Text>
                   </View>
+                  {selectedProperty.remindDay !== undefined && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Remind Day</Text>
+                      <Text style={styles.detailValue}>Day {selectedProperty.remindDay} of month</Text>
+                    </View>
+                  )}
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status</Text>
                     <Text
@@ -657,6 +703,21 @@ export default function LandlordProperties() {
                       </View>
                     ))}
                   </View>
+                )}
+
+                {!selectedProperty.isOccupied && (
+                  <TouchableOpacity
+                    style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12 }]}
+                    onPress={() => {
+                      setSelectedProperty(null);
+                      router.replace({
+                        pathname: '/(landlord)/payments',
+                        params: { openNewLease: 'true', propertyId: selectedProperty.id }
+                      });
+                    }}
+                  >
+                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>👤 Assign Tenant / Create Lease</Text>
+                  </TouchableOpacity>
                 )}
 
                 <TouchableOpacity

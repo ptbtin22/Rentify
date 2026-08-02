@@ -13,6 +13,7 @@ export interface KhuTro {
   id: string;
   name: string;
   address: string;
+  remindDay?: number;
 }
 
 export interface Property {
@@ -28,7 +29,24 @@ export interface Property {
   electricityRate: number; // e.g. price per kWh
   waterRate: number;       // e.g. flat rate or per m3
   serviceFee: number;      // e.g. flat monthly parking/maintenance fee
+  remindDay?: number;
 }
+
+export interface AppConfig {
+  remindDay: number;
+  lateDays: number;
+  leaseWarningDays: number;
+  billingChannels: string[];
+  leaseChannels: string[];
+}
+
+let appConfig: AppConfig = {
+  remindDay: 1,
+  lateDays: 3,
+  leaseWarningDays: 14,
+  billingChannels: ['Zalo', 'SMS'],
+  leaseChannels: ['Zalo', 'Email']
+};
 
 export interface Tenant {
   id: string;
@@ -211,6 +229,11 @@ export const Database = {
   getTenants: () => tenants,
   getLeases: () => leases,
   getPayments: () => payments,
+  getAppConfig: () => appConfig,
+  updateAppConfig: (newConfig: Partial<AppConfig>) => {
+    appConfig = { ...appConfig, ...newConfig };
+    notify();
+  },
   
   subscribe: (l: () => void) => {
     listeners.add(l);
@@ -329,11 +352,12 @@ export const Database = {
     return khuTros;
   },
 
-  addKhuTro: (name: string, address: string) => {
+  addKhuTro: (name: string, address: string, remindDay?: number) => {
     const newKhu: KhuTro = {
       id: 'khu-' + Math.random().toString(36).substring(7),
       name,
-      address
+      address,
+      remindDay
     };
     khuTros.push(newKhu);
     notify();

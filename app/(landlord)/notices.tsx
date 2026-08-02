@@ -29,6 +29,7 @@ import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepos
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import { useElderlyMode } from '../../services/AccessibilityManager';
 import { Database } from '../../services/Database';
+import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'react-native';
@@ -48,11 +49,6 @@ export default function LandlordNotices() {
 
   // Configuration States (MVP Requirements)
   const [isConfigVisible, setIsConfigVisible] = useState(false);
-  const [remindDay, setRemindDay] = useState('5');
-  const [lateDays, setLateDays] = useState('3');
-  const [billingChannels, setBillingChannels] = useState<string[]>(['Zalo', 'SMS']);
-  const [leaseWarningDays, setLeaseWarningDays] = useState('14');
-  const [leaseChannels, setLeaseChannels] = useState<string[]>(['Zalo', 'Email']);
 
   // Accessibilities & Social Profile States (Q3 & Q6)
   const { adjustSize } = useElderlyMode();
@@ -110,17 +106,7 @@ export default function LandlordNotices() {
     }
   };
 
-  const toggleBillingChannel = (channel: string) => {
-    setBillingChannels(prev => 
-      prev.includes(channel) ? prev.filter(c => c !== channel) : [...prev, channel]
-    );
-  };
 
-  const toggleLeaseChannel = (channel: string) => {
-    setLeaseChannels(prev => 
-      prev.includes(channel) ? prev.filter(c => c !== channel) : [...prev, channel]
-    );
-  };
 
   const handleSendNotice = async () => {
     if (!composeBody.trim()) return;
@@ -259,144 +245,10 @@ export default function LandlordNotices() {
         )}
       />
 
-      {/* ─── Configuration Modal (Missing MVP requirement) ─── */}
-      <Modal 
-        visible={isConfigVisible} 
-        animationType="slide" 
-        transparent
-        onRequestClose={() => setIsConfigVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setIsConfigVisible(false)}>
-                <Text style={styles.modalCancel}>{local('cancel')}</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Cấu Hình Thông Báo</Text>
-              <TouchableOpacity onPress={() => {
-                Alert.alert(local('notification_config_success'), local('notification_config_success_desc'));
-                setIsConfigVisible(false);
-              }}>
-                <Text style={[styles.modalSend, { color: themeColor }]}>{local('save')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalForm}>
-              
-              {/* Part 1: billing settings */}
-              <Text style={styles.sectionLabel}>{local('billing_reminders_config')}</Text>
-              <View style={styles.configItemRow}>
-                <Text style={styles.configItemLabel}>{local('billing_day_label')}</Text>
-                <TextInput
-                  style={styles.configNumberInput}
-                  keyboardType="numeric"
-                  value={remindDay}
-                  onChangeText={setRemindDay}
-                  maxLength={2}
-                />
-              </View>
-              
-              <View style={styles.configItemRow}>
-                <Text style={styles.configItemLabel}>{local('late_billing_days')}</Text>
-                <TextInput
-                  style={styles.configNumberInput}
-                  keyboardType="numeric"
-                  value={lateDays}
-                  onChangeText={setLateDays}
-                  maxLength={2}
-                />
-              </View>
-
-              <Text style={styles.configSubLabel}>{local('notification_channels')}</Text>
-              <View style={styles.channelsRow}>
-                {['Zalo', 'SMS', 'Email'].map(ch => {
-                  const active = billingChannels.includes(ch);
-                  return (
-                    <TouchableOpacity
-                      key={ch}
-                      style={[styles.channelToggle, active && { backgroundColor: themeColor, borderColor: themeColor }]}
-                      onPress={() => toggleBillingChannel(ch)}
-                    >
-                      <Text style={[styles.channelToggleText, active && { color: '#FFF' }]}>{ch}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.configDivider} />
-
-              {/* SaaS pricing calculation card based on active leases count (Q7 requirement) */}
-              <Text style={[styles.sectionLabel, { fontSize: adjustSize(11) }]}>{local('config_monetization')}</Text>
-              <View style={styles.pricingCalcCard}>
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>{local('active_rooms_count')}</Text>
-                  <Text style={styles.pricingValue}>{Database.getLeases().filter(l => l.status === 'active').length} {local('rooms_unit')}</Text>
-                </View>
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>{local('channel_type')}</Text>
-                  <Text style={styles.pricingValue}>{billingChannels.join(' + ') || 'None'}</Text>
-                </View>
-                
-                {/* Calculate projected monthly ZBS invoice totals */}
-                <View style={styles.pricingRow}>
-                  <Text style={styles.pricingLabel}>{local('estimated_monthly_channel_cost')}</Text>
-                  <Text style={[styles.pricingValue, { color: themeColor, fontWeight: '800' }]}>
-                    {(() => {
-                      const activeLeases = Database.getLeases().filter(l => l.status === 'active').length;
-                      let ratePerNotice = 0;
-                      if (billingChannels.includes('Zalo')) ratePerNotice += 300;
-                      if (billingChannels.includes('SMS')) ratePerNotice += 800;
-                      if (billingChannels.includes('Email')) ratePerNotice += 50;
-
-                      // assume average of 2 notifications sent per active tenant monthly
-                      const totalEstimatedCost = activeLeases * 2 * ratePerNotice;
-                      return `${totalEstimatedCost.toLocaleString()} VND / tháng (~$${(totalEstimatedCost / 25000).toFixed(2)})`;
-                    })()}
-                  </Text>
-                </View>
-                <Text style={styles.pricingDisclaimer}>
-                  {local('pricing_terms')}
-                </Text>
-              </View>
-
-              <View style={styles.configDivider} />
-
-              {/* Part 2: Lease Warning settings */}
-              <Text style={styles.sectionLabel}>{local('lease_expiration_config')}</Text>
-              <View style={styles.configItemRow}>
-                <Text style={styles.configItemLabel}>{local('expiration_warning_days')}</Text>
-                <TextInput
-                  style={styles.configNumberInput}
-                  keyboardType="numeric"
-                  value={leaseWarningDays}
-                  onChangeText={setLeaseWarningDays}
-                  maxLength={2}
-                />
-              </View>
-
-              <Text style={styles.configSubLabel}>{local('lease_channels')}</Text>
-              <View style={styles.channelsRow}>
-                {['Zalo', 'SMS', 'Email'].map(ch => {
-                  const active = leaseChannels.includes(ch);
-                  return (
-                    <TouchableOpacity
-                      key={ch}
-                      style={[styles.channelToggle, active && { backgroundColor: themeColor, borderColor: themeColor }]}
-                      onPress={() => toggleLeaseChannel(ch)}
-                    >
-                      <Text style={[styles.channelToggleText, active && { color: '#FFF' }]}>{ch}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={{ height: 40 }} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <BillingConfigModal
+        visible={isConfigVisible}
+        onClose={() => setIsConfigVisible(false)}
+      />
 
       {/* ─── Poster Profile Modal (Q6 requirement) ─── */}
       <Modal 
