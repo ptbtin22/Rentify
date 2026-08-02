@@ -27,7 +27,7 @@ import { FacebookPostCard } from '../../components/FacebookPostCard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View as RNView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../services/AuthManager';
+import { useAuth, AuthManager } from '../../services/AuthManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { NotificationManager } from '../../services/NotificationManager';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
@@ -49,7 +49,8 @@ export default function TenantNotices() {
   const getTenantSenderName = () => {
     const leases = Database.getLeases();
     const properties = Database.getProperties();
-    const myLeases = leases.filter(l => l.tenantId === 'tenant-1' && l.status === 'active');
+    const loggedInId = AuthManager.getLoggedInTenantId();
+    const myLeases = leases.filter(l => l.tenantId === loggedInId && l.status === 'active');
     if (myLeases.length > 0) {
       const p = properties.find(prop => prop.id === myLeases[0].propertyId);
       if (p) {
@@ -127,18 +128,45 @@ export default function TenantNotices() {
     setIsRefreshing(false);
   };
 
+  const [activeKhuTroId, setActiveKhuTroId] = useState<string | undefined>(undefined);
+
+  const loadActiveRoomContext = () => {
+    const leases = Database.getLeases();
+    const properties = Database.getProperties();
+    const globalLeaseId = Database.getActiveTenantLeaseId();
+    
+    const lease = leases.find(l => l.id === globalLeaseId);
+    if (lease) {
+      const prop = properties.find(p => p.id === lease.propertyId);
+      if (prop) {
+        setActiveKhuTroId(prop.khuTroId);
+        return;
+      }
+    }
+    setActiveKhuTroId(undefined);
+  };
+
   useEffect(() => {
-    const unsubscribe = NoticeRepository.subscribe(newNotices => {
-      setNotices(newNotices);
+    const unsubscribeDb = Database.subscribe(() => {
+      loadActiveRoomContext();
+    });
+    loadActiveRoomContext();
+    return unsubscribeDb;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeNotices = NoticeRepository.subscribe(newNotices => {
+      const filtered = newNotices.filter(n => n.khuTroId === undefined || n.khuTroId === activeKhuTroId);
+      setNotices(filtered);
       
       // If the latest notice is a fire emergency, trigger the slide-down warning banner
-      if (newNotices.length > 0 && newNotices[0].type === 'fire') {
-        const latest = newNotices[0];
+      if (filtered.length > 0 && filtered[0].type === 'fire') {
+        const latest = filtered[0];
         triggerEmergencyBanner(latest.body);
       }
     });
-    return unsubscribe;
-  }, []);
+    return unsubscribeNotices;
+  }, [activeKhuTroId]);
 
   const triggerEmergencyBanner = (text: string) => {
     setEmergencyText(text);

@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useAuth, Role, AuthManager } from '../services/AuthManager';
 import { useLanguage } from '../services/LanguageManager';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getPhoneLimit, sanitisePhoneInput, validatePhone } from '../services/PhoneUtils';
 
 export default function Login() {
   const router = useRouter();
@@ -118,23 +119,9 @@ export default function Login() {
   // Theme Colors
   const themeColor = role === 'landlord' ? '#007AFF' : '#34C759'; // Blue vs Green
 
-  // Phone Validation
-  const getPhoneLimit = (code: string) => {
-    if (code === '+84') return 9; // VN
-    if (code === '+1') return 10; // US
-    return 8; // SG (+65)
-  };
-
+  // Phone Validation — rules live in services/PhoneUtils.ts
   const handlePhoneChange = (text: string) => {
-    let filtered = text.replace(/[^0-9]/g, '');
-    if (countryCode === '+84' && filtered.startsWith('0')) {
-      filtered = filtered.substring(1);
-    }
-    const limit = getPhoneLimit(countryCode);
-    if (filtered.length > limit) {
-      filtered = filtered.substring(0, limit);
-    }
-    setPhoneNumber(filtered);
+    setPhoneNumber(sanitisePhoneInput(text, countryCode));
   };
 
   const toggleLanguage = () => {
@@ -151,11 +138,9 @@ export default function Login() {
       return;
     }
 
-    const limit = getPhoneLimit(countryCode);
-    if (phoneNumber.length !== limit) {
-      if (countryCode === '+84') setErrorMessage(local('err_phone_digits_vi'));
-      else if (countryCode === '+1') setErrorMessage(local('err_phone_digits_us'));
-      else setErrorMessage(local('err_phone_digits_sg'));
+    const phoneError = validatePhone(phoneNumber, countryCode);
+    if (phoneError) {
+      setErrorMessage(local(phoneError));
       return;
     }
 
@@ -168,7 +153,7 @@ export default function Login() {
     // Simulate API request delay
     setTimeout(() => {
       setIsLoading(false);
-      const isCorrect = AuthManager.verifyPassword(role, password);
+      const isCorrect = AuthManager.verifyPassword(role, password, phoneNumber);
       if (!isCorrect) {
         setErrorMessage(local('err_incorrect_password'));
         return;

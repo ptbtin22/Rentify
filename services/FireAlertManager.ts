@@ -8,6 +8,7 @@
 import { Vibration, Platform } from 'react-native';
 import * as Speech from 'expo-speech';
 import { getLanguage } from './LanguageManager';
+import { Database } from './Database';
 
 // Vibration pattern: [delay, vibrate, delay, vibrate...]
 // For a continuous alarm feel: 500ms silent, 1000ms vibrate
@@ -68,6 +69,7 @@ class FireAlertManager {
 
   private playSpeechWarning() {
     if (!this.isAlerting) return;
+    if (!Database.isFireSoundEnabled()) return;
 
     const currentLang = getLanguage();
     const speakText = currentLang === 'vi'

@@ -23,7 +23,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../services/AuthManager';
+import { useAuth, AuthManager } from '../../services/AuthManager';
 import { Database, Property, Lease, Payment } from '../../services/Database';
 import { useElderlyMode } from '../../services/AccessibilityManager';
 import { useLanguage } from '../../services/LanguageManager';
@@ -31,6 +31,7 @@ import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { PostDetailModal } from '../../components/PostDetailModal';
 import { Notice } from '../../services/NoticeRepository';
+import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 
 export default function TenantPortal() {
   const { local, language } = useLanguage();
@@ -43,12 +44,12 @@ export default function TenantPortal() {
   const [tenantLeases, setTenantLeases] = useState<Lease[]>([]);
   
   // Track currently selected lease context
-  const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
   const [isContractVisible, setIsContractVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
   const { adjustSize } = useElderlyMode();
 
   // Meter Reading & Billing States
@@ -67,14 +68,16 @@ export default function TenantPortal() {
     const properties = Database.getProperties();
     const payments = Database.getPayments();
 
-    // jane tenant represents tenant-1
-    const activeLeases = leases.filter(l => l.tenantId === 'tenant-1' && l.status === 'active');
+    const loggedInId = AuthManager.getLoggedInTenantId();
+    const activeLeases = leases.filter(l => l.tenantId === loggedInId && l.status === 'active');
     setTenantLeases(activeLeases);
 
-    // Choose lease based on selectedLeaseId
-    let lease = activeLeases.find(l => l.id === selectedLeaseId) || null;
+    // Choose lease based on selectedLeaseId from global Database state
+    const globalLeaseId = Database.getActiveTenantLeaseId();
+    let lease = activeLeases.find(l => l.id === globalLeaseId) || null;
     if (!lease && activeLeases.length > 0) {
       lease = activeLeases[0];
+      Database.setActiveTenantLeaseId(lease.id);
     }
     setActiveLease(lease);
 
@@ -94,7 +97,7 @@ export default function TenantPortal() {
     const unsubscribe = Database.subscribe(loadTenantData);
     loadTenantData();
     return unsubscribe;
-  }, [selectedLeaseId]);
+  }, []);
 
   const handleSwitchRoom = () => {
     const properties = Database.getProperties();
@@ -117,7 +120,7 @@ export default function TenantPortal() {
         (buttonIndex) => {
           if (buttonIndex > 0) {
             const selectedLease = tenantLeases[buttonIndex - 1];
-            setSelectedLeaseId(selectedLease.id);
+            Database.setActiveTenantLeaseId(selectedLease.id);
           }
         }
       );
@@ -127,7 +130,7 @@ export default function TenantPortal() {
         'Choose a room context:',
         options.map((name, idx) => ({
           text: name,
-          onPress: () => setSelectedLeaseId(tenantLeases[idx].id)
+          onPress: () => Database.setActiveTenantLeaseId(tenantLeases[idx].id)
         })),
         { cancelable: true }
       );
@@ -144,24 +147,56 @@ export default function TenantPortal() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Top Header */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>Welcome Back 👋</Text>
-          {tenantLeases.length > 1 ? (
-            <TouchableOpacity onPress={handleSwitchRoom} style={styles.roomSwitcherBtn}>
-              <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>
-                Jane Tenant ({property ? property.name : 'Select Room'} ▾)
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Jane Tenant</Text>
-          )}
+          {(() => {
+            const currentTenant = Database.getTenants().find(t => t.id === AuthManager.getLoggedInTenantId());
+            const tenantName = currentTenant ? currentTenant.name : 'Resident';
+            
+            if (tenantLeases.length > 1) {
+              return (
+                <TouchableOpacity onPress={handleSwitchRoom} style={styles.roomSwitcherBtn}>
+                  <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]} numberOfLines={1}>
+                    {tenantName} ({property ? property.name : 'Select Room'} ▾)
+                  </Text>
+                </TouchableOpacity>
+              );
+            } else {
+              return (
+                <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>
+                  {tenantName}
+                </Text>
+              );
+            }
+          })()}
         </View>
-        <TouchableOpacity 
-          style={styles.profileHeaderBtn} 
-          onPress={() => setIsDropdownVisible(!isDropdownVisible)}
-        >
-          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>JT</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity 
+            style={[styles.profileHeaderBtn, { backgroundColor: '#FF3B301A', borderColor: '#FF3B3033' }]}
+            onPress={() => setIsFireConfirmVisible(true)}
+            accessibilityLabel="Emergency Fire Alert"
+          >
+            <Text style={{ fontSize: 18 }}>🚨</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.profileHeaderBtn} 
+            onPress={() => setIsDropdownVisible(!isDropdownVisible)}
+          >
+            <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>
+              {(() => {
+                const currentTenant = Database.getTenants().find(t => t.id === AuthManager.getLoggedInTenantId());
+                if (currentTenant) {
+                  const parts = currentTenant.name.split(' ');
+                  if (parts.length >= 2) {
+                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                  }
+                  return currentTenant.name.substring(0, 2).toUpperCase();
+                }
+                return 'JT';
+              })()}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ─── Profile Dropdown Menu Overlay ─── */}
@@ -247,6 +282,39 @@ export default function TenantPortal() {
             </View>
           </View>
         </View>
+
+        {/* ─── Lease Expiration Warning Banner (MVP D2) ─── */}
+        {(() => {
+          if (!activeLease) return null;
+          // Calculate days remaining
+          const end = new Date(activeLease.endDate);
+          const now = new Date();
+          end.setHours(0, 0, 0, 0);
+          now.setHours(0, 0, 0, 0);
+          const diffTime = end.getTime() - now.getTime();
+          const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          const warningDays = Database.getAppConfig().leaseWarningDays;
+          const isExpiringSoon = daysRemaining > 0 && daysRemaining <= warningDays;
+
+          if (!isExpiringSoon) return null;
+
+          return (
+            <View style={styles.expirationBanner}>
+              <Text style={styles.expirationBannerIcon}>⚠️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.expirationBannerTitle}>
+                  {language === 'vi' ? 'Hợp đồng sắp hết hạn!' : 'Lease Expiring Soon!'}
+                </Text>
+                <Text style={styles.expirationBannerDesc}>
+                  {language === 'vi'
+                    ? `Hợp đồng phòng sẽ hết hạn vào ngày ${activeLease.endDate}. Còn lại ${daysRemaining} ngày.`
+                    : `Your room lease agreement expires on ${activeLease.endDate}. ${daysRemaining} days remaining.`}
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* ─── Billing Action Banner (Missing MVP requirement) ─── */}
         {getPendingBill() ? (
@@ -371,6 +439,27 @@ export default function TenantPortal() {
 
                     {/* Camera Control Footer */}
                     <View style={styles.cameraControls}>
+                      <TouchableOpacity
+                        style={[styles.secondaryScanBtn, { marginRight: 20 }]}
+                        onPress={() => {
+                          setIsScanningLoader(true);
+                          setTimeout(() => {
+                            setIsScanningLoader(false);
+                            Vibration.vibrate(120);
+                            Alert.alert(
+                              language === 'vi' ? 'OCR Thất Bại' : 'OCR Scanning Failed',
+                              language === 'vi' 
+                                ? 'Không thể nhận diện chỉ số từ ảnh chụp. Vui lòng nhập tay chỉ số điện.'
+                                : 'Could not extract value from photo. Please enter electricity usage manually.'
+                            );
+                            setMeterKwh('');
+                            setMeterReadingStep('breakdown');
+                          }, 1000);
+                        }}
+                      >
+                        <Text style={styles.secondaryScanText}>Manual</Text>
+                      </TouchableOpacity>
+
                       <TouchableOpacity
                         style={styles.shutterButton}
                         onPress={() => {
@@ -611,9 +700,36 @@ export default function TenantPortal() {
                 </View>
               </View>
             </ScrollView>
-            </View>
+          </View>
         </View>
       </Modal>
+
+
+      
+      <FireConfirmationModal
+        visible={isFireConfirmVisible}
+        onClose={() => setIsFireConfirmVisible(false)}
+        onConfirm={async () => {
+          const NoticeRepository = require('../../services/NoticeRepository').NoticeRepository;
+          const NotificationManager = require('../../services/NotificationManager').NotificationManager;
+          
+          await NoticeRepository.addNotice(
+            'fire',
+            local('emergency_fire_alert'),
+            local('fire_alert_message'),
+            language === 'vi' ? `Cư dân - ${property?.name || 'Phòng'}` : `Resident - ${property?.name || 'Room'}`,
+            new Date(),
+            undefined,
+            true,
+            property?.khuTroId
+          );
+          
+          await NotificationManager.triggerLocalNotification(
+            '🔥 ' + local('emergency_fire_alert'),
+            local('fire_alert_message')
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1266,5 +1382,45 @@ const styles = StyleSheet.create({
   dropdownDivider: {
     height: 1,
     backgroundColor: '#F2F2F7'
+  },
+  expirationBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#FF95001A',
+    borderWidth: 1.5,
+    borderColor: '#FF950033',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    alignItems: 'center',
+    gap: 12
+  },
+  expirationBannerIcon: {
+    fontSize: 24
+  },
+  expirationBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FF9500'
+  },
+  expirationBannerDesc: {
+    fontSize: 13,
+    color: '#FF9500BB',
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 18
+  },
+  secondaryScanBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  secondaryScanText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700'
   }
 });

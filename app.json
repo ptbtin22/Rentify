@@ -24,7 +24,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Rentify needs access to your photo library to attach images to announcements.",
+          "cameraPermission": "Rentify needs access to your camera to take photos for announcements."
+        }
+      ]
     ]
   }
 }

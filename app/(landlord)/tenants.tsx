@@ -16,12 +16,15 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  Linking
+  Linking,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useRouter } from 'expo-router';
+import { PhoneInput } from '../../components/PhoneInput';
+import { validatePhone } from '../../services/PhoneUtils';
 
 export default function LandlordTenants() {
   const { local } = useLanguage();
@@ -34,10 +37,15 @@ export default function LandlordTenants() {
   const [isAddVisible, setIsAddVisible] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
+  // Credentials presentation states
+  const [createdCredentials, setCreatedCredentials] = useState<{ name: string; phone: string; password?: string } | null>(null);
+  const [isCredentialsModalVisible, setIsCredentialsModalVisible] = useState(false);
+
   // Form Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+84');
   const [notes, setNotes] = useState('');
 
   const refreshData = () => {
@@ -53,19 +61,29 @@ export default function LandlordTenants() {
   }, []);
 
   const handleSave = () => {
-    if (!name.trim() || !email.trim()) return;
+    if (!name.trim()) return;
+    const phoneError = validatePhone(phone, countryCode);
+    if (phoneError) return; // phone not yet complete
 
+    const fullPhone = countryCode + phone;
+
+    const tempPassword = 'RT-' + Math.floor(1000 + Math.random() * 9000);
     Database.addTenant({
       name,
       email,
-      phone,
-      notes
+      phone: fullPhone,
+      notes,
+      password: tempPassword
     });
+
+    setCreatedCredentials({ name, phone: fullPhone, password: tempPassword });
+    setIsCredentialsModalVisible(true);
 
     // Reset Form
     setName('');
     setEmail('');
     setPhone('');
+    setCountryCode('+84');
     setNotes('');
     setIsAddVisible(false);
   };
@@ -169,8 +187,8 @@ export default function LandlordTenants() {
               <Text style={styles.modalTitle}>Add Tenant</Text>
               <TouchableOpacity
                 onPress={handleSave}
-                disabled={!name.trim() || !email.trim()}
-                style={(!name.trim() || !email.trim()) && { opacity: 0.5 }}
+                disabled={!name.trim() || validatePhone(phone, countryCode) !== null}
+                style={(!name.trim() || validatePhone(phone, countryCode) !== null) && { opacity: 0.5 }}
               >
                 <Text style={styles.modalSave}>Save</Text>
               </TouchableOpacity>
@@ -192,7 +210,7 @@ export default function LandlordTenants() {
               <View style={styles.inputBox}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Email"
+                  placeholder="Email (Optional)"
                   placeholderTextColor="#8E8E93"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -202,16 +220,12 @@ export default function LandlordTenants() {
                 />
               </View>
 
-              <View style={styles.inputBox}>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Phone"
-                  placeholderTextColor="#8E8E93"
-                  keyboardType="phone-pad"
-                  value={phone}
-                  onChangeText={setPhone}
-                />
-              </View>
+              <PhoneInput
+                value={phone}
+                countryCode={countryCode}
+                onChangePhone={setPhone}
+                onChangeCountry={setCountryCode}
+              />
 
               <Text style={styles.label}>Notes</Text>
               <View style={styles.notesBox}>
@@ -264,7 +278,6 @@ export default function LandlordTenants() {
                       style={styles.zaloBtn}
                       onPress={() => {
                         const cleanPhone = selectedTenant.phone.replace(/[^0-9]/g, '');
-                        // Strip leading +84 or 0 if desired, but zalo.me works best with raw local digits or +84
                         Linking.openURL(`https://zalo.me/${cleanPhone}`);
                       }}
                     >
@@ -321,6 +334,61 @@ export default function LandlordTenants() {
             </View>
           </View>
         )}
+      </Modal>
+
+      {/* Credentials Success Modal */}
+      <Modal
+        visible={isCredentialsModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsCredentialsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContent}>
+            <Text style={styles.successIcon}>🎉</Text>
+            <Text style={styles.successTitle}>Tenant Created!</Text>
+            <Text style={styles.successDesc}>
+              Share these credentials with the tenant so they can log in to their account.
+            </Text>
+            
+            <View style={styles.credentialsCard}>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Name:</Text>
+                <Text style={styles.credentialValue}>{createdCredentials?.name}</Text>
+              </View>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Phone:</Text>
+                <Text style={styles.credentialValue}>{createdCredentials?.phone || 'N/A'}</Text>
+              </View>
+              <View style={styles.credentialRow}>
+                <Text style={styles.credentialLabel}>Password:</Text>
+                <Text style={[styles.credentialValue, styles.tempPasswordText]}>
+                  {createdCredentials?.password}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={() => {
+                const Clipboard = require('react-native').Clipboard;
+                Clipboard.setString(
+                  `Rentify Login Credentials:\nPhone: ${createdCredentials?.phone}\nPassword: ${createdCredentials?.password}\nPlease change your password in settings after logging in.`
+                );
+                Alert.alert('Copied', 'Credentials copied to clipboard!');
+              }}
+            >
+              <Text style={styles.copyButtonText}>📋 Copy Credentials</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.successCloseBtn}
+              onPress={() => setIsCredentialsModalVisible(false)}
+            >
+              <Text style={styles.successCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -586,6 +654,96 @@ const styles = StyleSheet.create({
     borderColor: '#007AFF4D'
   },
   zaloBtnText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  successModalContent: {
+    width: '100%',
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 34, // Safe area padding for notches
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  successIcon: {
+    fontSize: 48,
+    marginBottom: 12
+  },
+  successTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  successDesc: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18
+  },
+  credentialsCard: {
+    width: '100%',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 16,
+    gap: 10,
+    marginBottom: 20
+  },
+  credentialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  credentialLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93'
+  },
+  credentialValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  tempPasswordText: {
+    color: '#FF9500',
+    fontSize: 15,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  copyButton: {
+    width: '100%',
+    height: 46,
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10
+  },
+  copyButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  successCloseBtn: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  successCloseBtnText: {
     color: '#007AFF',
     fontSize: 14,
     fontWeight: '700'

@@ -18,6 +18,7 @@ import { useAuth, AuthManager } from '../services/AuthManager';
 import { TextInput } from 'react-native';
 import { useLanguage } from '../services/LanguageManager';
 import { useElderlyMode } from '../services/AccessibilityManager';
+import { Database } from '../services/Database';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -29,6 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
   const { local, language, setLanguage } = useLanguage();
   const { isElderly, setElderlyMode, adjustSize } = useElderlyMode();
   const insets = useSafeAreaInsets();
+  const [fireSoundEnabled, setFireSoundEnabled] = React.useState(Database.isFireSoundEnabled());
 
   // Password change states (Q9)
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
@@ -104,6 +106,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
                 onValueChange={setElderlyMode}
                 trackColor={{ false: '#767577', true: '#34C759' }}
                 thumbColor={isElderly ? '#FFF' : '#f4f3f4'}
+              />
+            </View>
+          </View>
+
+          {/* Section 1.5: Emergency sound options */}
+          <Text style={[styles.sectionLabel, { fontSize: adjustSize(11) }]}>{local('notification_settings') || 'PREFERENCES'}</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={[styles.label, { fontSize: adjustSize(14) }]}>
+                  {language === 'vi' ? 'Âm báo báo cháy (Siren)' : 'Fire Alarm Siren Sound'}
+                </Text>
+              </View>
+              <Switch
+                value={fireSoundEnabled}
+                onValueChange={(val) => {
+                  setFireSoundEnabled(val);
+                  Database.setFireSoundEnabled(val);
+                }}
+                trackColor={{ false: '#767577', true: '#FF3B30' }}
+                thumbColor={fireSoundEnabled ? '#FFF' : '#f4f3f4'}
               />
             </View>
           </View>

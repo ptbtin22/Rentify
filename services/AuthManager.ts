@@ -6,16 +6,17 @@
 //
 
 import { useState, useEffect } from 'react';
+import { Database } from './Database';
 
 export type Role = 'landlord' | 'tenant';
 
 let isLoggedInGlobal = false;
 let currentRoleGlobal: Role = 'landlord';
 let onboardingCompletedGlobal = false;
+let loggedInTenantIdGlobal = 'tenant-1'; // Default for fallback
 
 // Stateful passwords (Q9 Change Password feature)
 let landlordPasswordGlobal = '123456';
-let tenantPasswordGlobal = '123456';
 
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(l => l());
@@ -24,6 +25,7 @@ export const AuthManager = {
   isLoggedIn: () => isLoggedInGlobal,
   currentRole: () => currentRoleGlobal,
   onboardingCompleted: () => onboardingCompletedGlobal,
+  getLoggedInTenantId: () => loggedInTenantIdGlobal,
   
   login: (role: Role) => {
     isLoggedInGlobal = true;
@@ -41,34 +43,81 @@ export const AuthManager = {
     notify();
   },
   
-  verifyPassword: (role: Role, password: string): boolean => {
-    const correct = role === 'landlord' ? landlordPasswordGlobal : tenantPasswordGlobal;
-    return password === correct;
+  verifyPassword: (role: Role, password: string, phone?: string): boolean => {
+    if (role === 'landlord') {
+      return password === landlordPasswordGlobal;
+    }
+    
+    // For tenant, look up by phone number in Database
+    if (!phone) {
+      // Fallback/Quick login
+      loggedInTenantIdGlobal = 'tenant-1';
+      const tenant1 = Database.getTenants().find(t => t.id === 'tenant-1');
+      return password === (tenant1?.password || '123456');
+    }
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const matchedTenant = Database.getTenants().find(t => {
+      const tc = t.phone.replace(/[^0-9]/g, '');
+      return tc === cleanPhone || (cleanPhone.startsWith('0') && tc === cleanPhone.substring(1)) || (tc.startsWith('0') && cleanPhone === tc.substring(1));
+    });
+
+    if (!matchedTenant) {
+      return false;
+    }
+
+    if (password === matchedTenant.password) {
+      loggedInTenantIdGlobal = matchedTenant.id;
+      return true;
+    }
+    return false;
   },
   
   changePassword: (role: Role, oldPass: string, newPass: string): { success: boolean; error?: string } => {
-    const current = role === 'landlord' ? landlordPasswordGlobal : tenantPasswordGlobal;
-    if (oldPass !== current) {
-      return { success: false, error: 'err_incorrect_password' };
-    }
     if (newPass.length < 6) {
       return { success: false, error: 'err_password_too_short' };
     }
+
     if (role === 'landlord') {
+      if (oldPass !== landlordPasswordGlobal) {
+        return { success: false, error: 'err_incorrect_password' };
+      }
       landlordPasswordGlobal = newPass;
+      return { success: true };
     } else {
-      tenantPasswordGlobal = newPass;
+      const tenant = Database.getTenants().find(t => t.id === loggedInTenantIdGlobal);
+      if (!tenant) {
+        return { success: false, error: 'err_tenant_not_found' };
+      }
+      if (oldPass !== (tenant.password || '123456')) {
+        return { success: false, error: 'err_incorrect_password' };
+      }
+      Database.updateTenantPassword(tenant.id, newPass);
+      return { success: true };
     }
-    return { success: true };
   },
   
   resetPasswordByPhone: (phone: string, newPass: string): { success: boolean; error?: string } => {
-    // Normalize phone number (strip leading 0 or country codes if necessary, check landlord / tenant)
     const normalized = phone.replace(/[^0-9]/g, '');
-    const isLandlord = normalized.endsWith('901234567');
-    const isTenant = normalized.endsWith('909888777');
     
-    if (!isLandlord && !isTenant) {
+    // Check landlord phone
+    const isLandlord = normalized.endsWith('901234567');
+    if (isLandlord) {
+      if (newPass.length < 6) {
+        return { success: false, error: 'err_password_too_short' };
+      }
+      landlordPasswordGlobal = newPass;
+      return { success: true };
+    }
+
+    // Check tenant phone in database
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const matchedTenant = Database.getTenants().find(t => {
+      const tc = t.phone.replace(/[^0-9]/g, '');
+      return tc === cleanPhone || (cleanPhone.startsWith('0') && tc === cleanPhone.substring(1)) || (tc.startsWith('0') && cleanPhone === tc.substring(1));
+    });
+
+    if (!matchedTenant) {
       return { success: false, error: 'err_phone_not_registered' };
     }
     
@@ -76,11 +125,7 @@ export const AuthManager = {
       return { success: false, error: 'err_password_too_short' };
     }
     
-    if (isLandlord) {
-      landlordPasswordGlobal = newPass;
-    } else {
-      tenantPasswordGlobal = newPass;
-    }
+    Database.updateTenantPassword(matchedTenant.id, newPass);
     return { success: true };
   },
   

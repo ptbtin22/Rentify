@@ -53,7 +53,8 @@ export interface Tenant {
   name: string;
   email: string;
   phone: string;
-  notes: string;
+  notes?: string;
+  password?: string; // Stored password (initially temp)
 }
 
 export interface Lease {
@@ -136,14 +137,16 @@ let tenants: Tenant[] = [
     name: 'Jane Tenant',
     email: 'jane@example.com',
     phone: '901234567',
-    notes: 'Likes quiet hours.'
+    notes: 'Likes quiet hours.',
+    password: '123456'
   },
   {
     id: 'tenant-2',
     name: 'John Doe',
     email: 'john@example.com',
     phone: '987654321',
-    notes: 'Interested in house viewings.'
+    notes: 'Interested in house viewings.',
+    password: '123456'
   }
 ];
 
@@ -224,6 +227,9 @@ let payments: Payment[] = [
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(l => l());
 
+let activeTenantLeaseId: string | null = null;
+let fireSoundEnabled = true;
+
 export const Database = {
   getProperties: () => properties,
   getTenants: () => tenants,
@@ -232,6 +238,17 @@ export const Database = {
   getAppConfig: () => appConfig,
   updateAppConfig: (newConfig: Partial<AppConfig>) => {
     appConfig = { ...appConfig, ...newConfig };
+    notify();
+  },
+  
+  getActiveTenantLeaseId: () => activeTenantLeaseId,
+  setActiveTenantLeaseId: (id: string | null) => {
+    activeTenantLeaseId = id;
+    notify();
+  },
+  isFireSoundEnabled: () => fireSoundEnabled,
+  setFireSoundEnabled: (enabled: boolean) => {
+    fireSoundEnabled = enabled;
     notify();
   },
   
@@ -271,6 +288,11 @@ export const Database = {
     tenants.push(newTenant);
     notify();
     return newTenant;
+  },
+
+  updateTenantPassword: (id: string, newPass: string) => {
+    tenants = tenants.map(t => t.id === id ? { ...t, password: newPass } : t);
+    notify();
   },
 
   deleteTenant: (id: string) => {

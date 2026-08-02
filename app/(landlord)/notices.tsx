@@ -34,6 +34,7 @@ import { FacebookPostCard } from '../../components/FacebookPostCard';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'react-native';
 import { PostDetailModal } from '../../components/PostDetailModal';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function LandlordNotices() {
   const router = useRouter();
@@ -61,9 +62,70 @@ export default function LandlordNotices() {
   const [composeMediaUri, setComposeMediaUri] = useState('');
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   
-  const canSend = composeTitle.trim() || composeBody.trim();
+  const canSend = composeBody.trim().length > 0;
 
   const themeColor = '#007AFF'; // Blue theme for landlord
+
+  // Real image picker — opens ActionSheet on iOS to choose Camera vs Library
+  const handlePickImage = async () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 1) {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              allowsEditing: true,
+              aspect: [4, 3]
+            });
+            if (!result.canceled && result.assets.length > 0) {
+              setComposeMediaUri(result.assets[0].uri);
+            }
+          } else if (buttonIndex === 2) {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Photo library access is needed to attach images.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              allowsEditing: true,
+              aspect: [4, 3]
+            });
+            if (!result.canceled && result.assets.length > 0) {
+              setComposeMediaUri(result.assets[0].uri);
+            }
+          }
+        }
+      );
+    } else {
+      // Android: go straight to library picker
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Photo library access is needed to attach images.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3]
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        setComposeMediaUri(result.assets[0].uri);
+      }
+    }
+  };
 
   const loadNotices = async () => {
     setIsRefreshing(true);
@@ -362,19 +424,28 @@ export default function LandlordNotices() {
 
 
               <Text style={[styles.sectionLabel, { fontSize: adjustSize(13) }]}>{local('attach_media')}</Text>
-              <TouchableOpacity
-                style={styles.mediaAttachBtn}
-                onPress={() => {
-                  setComposeMediaUri(prev => prev ? '' : 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600');
-                }}
-              >
-                <Text style={[styles.mediaAttachBtnText, { fontSize: adjustSize(13) }]}>
-                  {composeMediaUri ? local('remove_attachment') : local('select_mock_image')}
-                </Text>
-              </TouchableOpacity>
               {composeMediaUri ? (
-                <Image source={{ uri: composeMediaUri }} style={styles.mediaAttachPreview} />
-              ) : null}
+                <View>
+                  <Image source={{ uri: composeMediaUri }} style={styles.mediaAttachPreview} />
+                  <TouchableOpacity
+                    style={styles.mediaAttachBtn}
+                    onPress={() => setComposeMediaUri('')}
+                  >
+                    <Text style={[styles.mediaAttachBtnText, { fontSize: adjustSize(13), color: '#FF3B30' }]}>
+                      {local('remove_attachment')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.mediaAttachBtn}
+                  onPress={handlePickImage}
+                >
+                  <Text style={[styles.mediaAttachBtnText, { fontSize: adjustSize(13) }]}>
+                    📎 {local('attach_media')}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <Text style={[styles.sectionLabel, { fontSize: adjustSize(13) }]}>{local('alert_level')}</Text>
               <View style={styles.segmentedListContainer}>
@@ -620,7 +691,8 @@ const styles = StyleSheet.create({
     minHeight: 120,
     backgroundColor: '#F2F2F7',
     borderRadius: 14,
-    padding: 12
+    padding: 12,
+    marginBottom: 32
   },
   editor: {
     flex: 1,

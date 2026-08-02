@@ -26,6 +26,7 @@ export interface Notice {
   mediaUri?: string;
   likedByMe?: boolean;
   approved: boolean; // Moderator flag (Q8 requirement)
+  khuTroId?: string; // Target building complex (A2)
 }
 
 let mockNotices: Notice[] = [
@@ -41,7 +42,8 @@ let mockNotices: Notice[] = [
       { id: 'c-1', senderName: 'Cư dân - Phòng 102', body: 'Cảm ơn ban quản lý đã thông báo trước.', createdAt: new Date(Date.now() - 1 * 3600000) }
     ],
     mediaUri: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600',
-    approved: true
+    approved: true,
+    khuTroId: 'khu-1'
   },
   {
     id: '2',
@@ -52,7 +54,8 @@ let mockNotices: Notice[] = [
     createdAt: new Date(Date.now() - 5 * 3600000),
     likes: 2,
     comments: [],
-    approved: true
+    approved: true,
+    khuTroId: 'khu-1'
   },
   {
     id: '3',
@@ -63,7 +66,8 @@ let mockNotices: Notice[] = [
     createdAt: new Date(Date.now() - 1 * 3600000),
     likes: 0,
     comments: [],
-    approved: false // Pending approval by Landlord
+    approved: false, // Pending approval by Landlord
+    khuTroId: 'khu-1'
   }
 ];
 
@@ -89,7 +93,8 @@ export const NoticeRepository = {
     senderName: string,
     createdAt: Date = new Date(),
     mediaUri?: string,
-    approved: boolean = true
+    approved: boolean = true,
+    khuTroId?: string
   ): Promise<Notice> => {
     await new Promise(resolve => setTimeout(resolve, 150));
     const newNotice: Notice = {
@@ -103,7 +108,8 @@ export const NoticeRepository = {
       comments: [],
       mediaUri,
       likedByMe: false,
-      approved
+      approved,
+      khuTroId
     };
     mockNotices.push(newNotice);
     notifySubscribers();
