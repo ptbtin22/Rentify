@@ -230,7 +230,7 @@ export const translations: Record<string, Record<Language, string>> = {
   outstanding_invoices: { en: "Outstanding Invoices (Pending):", vi: "Số tiền chưa thu (Chờ):" },
   total_projected: { en: "Total Projected Income:", vi: "Tổng doanh thu dự kiến:" },
   monthly_projections: { en: "Monthly Projections", vi: "Dự kiến doanh thu" },
-  avg_rent_breakdown: { en: "Average Rent Breakdown", vi: "Cơ cấu giá phòng trung bình" },
+  average_rent_breakdown: { en: "Average Rent Breakdown", vi: "Cơ cấu giá phòng trung bình" },
   tenants: { en: "Tenants", vi: "Người Thuê" },
   add_tenant: { en: "Add Tenant", vi: "Thêm người thuê" },
   contact_info: { en: "Contact Information", vi: "Thông tin liên hệ" },
