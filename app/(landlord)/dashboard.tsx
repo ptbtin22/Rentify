@@ -313,7 +313,7 @@ export default function LandlordDashboard() {
       {/* ─── Premium Revenue Report Modal ─── */}
       <Modal visible={isReportVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingTop: insets.top }]}>
+          <View style={[styles.modalContent, { marginTop: insets.top + 16 }]}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsReportVisible(false)}>
                 <Text style={styles.modalCancel}>{local('close')}</Text>
@@ -632,14 +632,13 @@ const styles = StyleSheet.create({
   // ─── Modal Styles ───
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end'
+    backgroundColor: 'rgba(0,0,0,0.5)'
   },
   modalContent: {
-    height: '95%',
     backgroundColor: '#FFF',
     borderTopLeftRadius: 20,
-    borderTopRightRadius: 20
+    borderTopRightRadius: 20,
+    flex: 1
   },
   modalHeader: {
     height: 56,
