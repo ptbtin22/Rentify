@@ -17,7 +17,7 @@ import { View as RNView, Platform } from 'react-native';
 import { useAuth, AuthManager } from '../services/AuthManager';
 import { TextInput } from 'react-native';
 import { useLanguage } from '../services/LanguageManager';
-import { useElderlyMode } from '../services/AccessibilityManager';
+import { useEasyViewMode } from '../services/EasyViewManager';
 import { Database } from '../services/Database';
 
 interface SettingsModalProps {
@@ -28,7 +28,7 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
   const { currentRole } = useAuth();
   const { local, language, setLanguage } = useLanguage();
-  const { isElderly, setElderlyMode, adjustSize } = useElderlyMode();
+  const { isEasyView, setEasyViewMode, adjustSize } = useEasyViewMode();
   const insets = useSafeAreaInsets();
   const [fireSoundEnabled, setFireSoundEnabled] = React.useState(Database.isFireSoundEnabled());
 
@@ -99,13 +99,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={[styles.label, { fontSize: adjustSize(14) }]}>{local('elderly_mode')}</Text>
+                <Text style={[styles.label, { fontSize: adjustSize(14) }]}>{local('easy_view_mode')}</Text>
               </View>
               <Switch
-                value={isElderly}
-                onValueChange={setElderlyMode}
+                value={isEasyView}
+                onValueChange={setEasyViewMode}
                 trackColor={{ false: '#767577', true: '#34C759' }}
-                thumbColor={isElderly ? '#FFF' : '#f4f3f4'}
+                thumbColor={isEasyView ? '#FFF' : '#f4f3f4'}
               />
             </View>
           </View>

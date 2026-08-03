@@ -27,7 +27,7 @@ import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { Database } from '../../services/Database';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
@@ -35,24 +35,24 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'react-native';
 import { PostDetailModal } from '../../components/PostDetailModal';
 import * as ImagePicker from 'expo-image-picker';
-
+ 
 export default function LandlordNotices() {
   const router = useRouter();
   const { logout } = useAuth();
   const { local } = useLanguage();
-
+ 
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isComposeVisible, setIsComposeVisible] = useState(false);
   const [composeType, setComposeType] = useState<NoticeType>('info');
   const [composeBody, setComposeBody] = useState('');
   const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
-
+ 
   // Configuration States (MVP Requirements)
   const [isConfigVisible, setIsConfigVisible] = useState(false);
-
+ 
   // Accessibilities & Social Profile States (Q3 & Q6)
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const [selectedPosterName, setSelectedPosterName] = useState<string | null>(null);
   const [isPosterProfileVisible, setIsPosterProfileVisible] = useState(false);
 

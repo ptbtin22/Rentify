@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Notice } from '../services/NoticeRepository';
 import { useLanguage } from '../services/LanguageManager';
-import { useElderlyMode } from '../services/AccessibilityManager';
+import { useEasyViewMode } from '../services/EasyViewManager';
 import { FacebookPostCard } from './FacebookPostCard';
 
 interface PostDetailModalProps {
@@ -33,7 +33,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
   commenterName
 }) => {
   const { local } = useLanguage();
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const insets = useSafeAreaInsets();
 
   if (!item) return null;

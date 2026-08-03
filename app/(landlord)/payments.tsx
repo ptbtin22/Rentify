@@ -30,11 +30,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-
+ 
 // Helper: format Date → "YYYY-MM-DD" string for storage
 const formatDate = (date: Date): string => {
   const y = date.getFullYear();
@@ -42,19 +42,19 @@ const formatDate = (date: Date): string => {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
-
+ 
 // Helper: format Date → "Aug 1, 2026" readable label
 const formatLabel = (date: Date): string =>
   date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
+ 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
-
+ 
 export default function LandlordPayments() {
   const { local } = useLanguage();
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const [isConfigVisible, setIsConfigVisible] = useState(false);
   const params = useLocalSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);

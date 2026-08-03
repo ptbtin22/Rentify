@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { Database } from '../../services/Database';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
@@ -48,7 +48,7 @@ export default function LandlordDashboard() {
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
 
   // Calculate Metrics from Database
   const calculateMetrics = () => {

@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Database } from '../services/Database';
 import { useLanguage } from '../services/LanguageManager';
-import { useElderlyMode } from '../services/AccessibilityManager';
+import { useEasyViewMode } from '../services/EasyViewManager';
 
 interface BillingConfigModalProps {
   visible: boolean;
@@ -27,7 +27,7 @@ interface BillingConfigModalProps {
 
 export function BillingConfigModal({ visible, onClose }: BillingConfigModalProps) {
   const { local } = useLanguage();
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const insets = useSafeAreaInsets();
   const themeColor = '#007AFF'; // Blue theme color for landlord
 

@@ -21,7 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
 
 export default function LandlordProperties() {
@@ -79,7 +79,7 @@ export default function LandlordProperties() {
   const [selectedKhuFilterId, setSelectedKhuFilterId] = useState<'all' | string>('all');
   
   const { local, language } = useLanguage();
-  const { isElderly, adjustSize } = useElderlyMode();
+  const { isEasyView, adjustSize } = useEasyViewMode();
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
   const [rentAmount, setRentAmount] = useState('1500');
   const [bedrooms, setBedrooms] = useState(2);

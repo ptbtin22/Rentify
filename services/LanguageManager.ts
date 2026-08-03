@@ -79,7 +79,7 @@ export const translations: Record<string, Record<Language, string>> = {
   add_room: { en: "Add Room", vi: "Thêm phòng" },
   save: { en: "Save", vi: "Lưu" },
   accessibility_settings: { en: "Accessibility & Visuality", vi: "Trực quan & Hỗ trợ" },
-  elderly_mode: { en: "Elderly Mode (Large Text & Easy UI)", vi: "Chế độ Người Cao Tuổi (Chữ lớn, Tối giản)" },
+  easy_view_mode: { en: "Easy View Mode (Large Text & Easy UI)", vi: "Chế độ Dễ nhìn (Chữ lớn, Trực quan)" },
   language: { en: "Language", vi: "Ngôn ngữ" },
   settings: { en: "Settings", vi: "Cài đặt & Tùy chỉnh" },
   profile: { en: "Personal Profile", vi: "Hồ sơ cá nhân" },

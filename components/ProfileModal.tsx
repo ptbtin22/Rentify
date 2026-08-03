@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View as RNView, Platform } from 'react-native';
 import { useAuth } from '../services/AuthManager';
 import { useLanguage } from '../services/LanguageManager';
-import { useElderlyMode } from '../services/AccessibilityManager';
+import { useEasyViewMode } from '../services/EasyViewManager';
 import { NoticeRepository, Notice } from '../services/NoticeRepository';
 import { PostDetailModal } from './PostDetailModal';
 
@@ -30,7 +30,7 @@ interface ProfileModalProps {
 export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, onPostClick }) => {
   const { currentRole } = useAuth();
   const { local, language } = useLanguage();
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const [myNotices, setMyNotices] = useState<Notice[]>([]);
   const insets = useSafeAreaInsets();
   const [selectedPost, setSelectedPost] = useState<Notice | null>(null);

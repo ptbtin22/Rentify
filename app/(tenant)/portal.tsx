@@ -25,7 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, AuthManager } from '../../services/AuthManager';
 import { Database, Property, Lease, Payment } from '../../services/Database';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
@@ -34,17 +34,17 @@ import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-
+ 
 export default function TenantPortal() {
   const { local, language } = useLanguage();
   const router = useRouter();
   const { logout } = useAuth();
-
+ 
   const [activeLease, setActiveLease] = useState<Lease | null>(null);
   const [property, setProperty] = useState<Property | null>(null);
   const [tenantPayments, setTenantPayments] = useState<Payment[]>([]);
   const [tenantLeases, setTenantLeases] = useState<Lease[]>([]);
-  
+   
   // Track currently selected lease context
   const [isContractVisible, setIsContractVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
@@ -52,7 +52,7 @@ export default function TenantPortal() {
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
 
   // Meter Reading & Billing States
   const [isMeterModalVisible, setIsMeterModalVisible] = useState(false);

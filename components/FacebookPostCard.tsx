@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Notice, NoticeRepository } from '../services/NoticeRepository';
 import { useLanguage } from '../services/LanguageManager';
-import { useElderlyMode } from '../services/AccessibilityManager';
+import { useEasyViewMode } from '../services/EasyViewManager';
 
 interface FacebookPostCardProps {
   item: Notice;
@@ -32,7 +32,7 @@ export const FacebookPostCard: React.FC<FacebookPostCardProps> = ({
   onDeleteClick
 }) => {
   const { local } = useLanguage();
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const [commentText, setCommentText] = useState('');
 
   const handleLike = () => {

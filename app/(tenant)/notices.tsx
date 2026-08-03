@@ -20,7 +20,7 @@ import {
   Image,
   Platform
 } from 'react-native';
-import { useElderlyMode } from '../../services/AccessibilityManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { Database } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
@@ -32,17 +32,17 @@ import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepos
 import { NotificationManager } from '../../services/NotificationManager';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import { PostDetailModal } from '../../components/PostDetailModal';
-
+ 
 export default function TenantNotices() {
   const router = useRouter();
   const { logout } = useAuth();
   const { local } = useLanguage();
-
+ 
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
+ 
   // Accessibility & Profile States (Q3 & Q6)
-  const { adjustSize } = useElderlyMode();
+  const { adjustSize } = useEasyViewMode();
   const insets = useSafeAreaInsets();
   const { language } = useLanguage();
 
