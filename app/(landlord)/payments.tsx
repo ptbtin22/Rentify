@@ -31,6 +31,7 @@ import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../..
 import { useLanguage } from '../../services/LanguageManager';
 import { useElderlyMode } from '../../services/AccessibilityManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
+import * as ImagePicker from 'expo-image-picker';
 
 // Helper: format Date → "YYYY-MM-DD" string for storage
 const formatDate = (date: Date): string => {
@@ -86,11 +87,30 @@ export default function LandlordPayments() {
   const [monthlyRent, setMonthlyRent] = useState('');
   const [securityDeposit, setSecurityDeposit] = useState('');
 
-  // Camera mock states
+  // Camera states
   const [tenantPhoto, setTenantPhoto] = useState<string | undefined>(undefined);
   const [contractPhoto, setContractPhoto] = useState<string | undefined>(undefined);
-  const [isCameraVisible, setIsCameraVisible] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'tenant' | 'contract'>('tenant');
+
+  const handleCapturePhoto = async (mode: 'tenant' | 'contract') => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed to capture photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: mode === 'tenant' ? [1, 1] : [4, 3],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const uri = result.assets[0].uri;
+      if (mode === 'tenant') setTenantPhoto(uri);
+      else setContractPhoto(uri);
+      Vibration.vibrate(100);
+      Alert.alert('Photo Captured', 'Document snapshot has been attached to this lease agreement.');
+    }
+  };
 
   // Each picker needs two independent booleans:
   //   isMounted — controls whether the DateTimePicker is in the tree at all
@@ -526,15 +546,12 @@ export default function LandlordPayments() {
                   </View>
                   <TouchableOpacity
                     style={styles.photoCaptureBtn}
-                    onPress={() => {
-                      setCameraMode('tenant');
-                      setIsCameraVisible(true);
-                    }}
+                    onPress={() => handleCapturePhoto('tenant')}
                   >
                     <Text style={styles.photoCaptureText}>Capture</Text>
                   </TouchableOpacity>
                 </View>
-
+ 
                 <View style={styles.photoRow}>
                   <View style={styles.photoInfo}>
                     <Text style={styles.rowLabel}>Signed Contract</Text>
@@ -544,10 +561,7 @@ export default function LandlordPayments() {
                   </View>
                   <TouchableOpacity
                     style={styles.photoCaptureBtn}
-                    onPress={() => {
-                      setCameraMode('contract');
-                      setIsCameraVisible(true);
-                    }}
+                    onPress={() => handleCapturePhoto('contract')}
                   >
                     <Text style={styles.photoCaptureText}>Capture</Text>
                   </TouchableOpacity>
@@ -557,49 +571,6 @@ export default function LandlordPayments() {
               </ScrollView>
           </View>
 
-          {/* ── Simulated Camera Viewfinder Modal (Nested to render on top on iOS) ── */}
-          <Modal visible={isCameraVisible} animationType="slide" transparent>
-            <SafeAreaView style={styles.cameraOverlay}>
-              <View style={styles.cameraHeader}>
-                <TouchableOpacity onPress={() => setIsCameraVisible(false)}>
-                  <Text style={styles.cameraCancel}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.cameraTitle}>
-                  {cameraMode === 'tenant' ? 'Capture Tenant Photo' : 'Capture Contract Document'}
-                </Text>
-                <View style={{ width: 50 }} />
-              </View>
-
-              {/* Viewfinder simulation */}
-              <View style={styles.viewfinder}>
-                <View style={styles.scanTarget} />
-                <Text style={styles.cameraInstructions}>
-                  {cameraMode === 'tenant' ? 'Align tenant face inside the target frame' : 'Align contract sheet inside the target frame'}
-                </Text>
-              </View>
-
-              {/* Camera controls */}
-              <View style={styles.cameraControls}>
-                <TouchableOpacity
-                  style={styles.shutterButton}
-                  onPress={() => {
-                    const mockUrl = cameraMode === 'tenant' 
-                      ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' 
-                      : 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300';
-                    
-                    if (cameraMode === 'tenant') setTenantPhoto(mockUrl);
-                    else setContractPhoto(mockUrl);
-
-                    Vibration.vibrate(100);
-                    Alert.alert('Photo Captured', 'Document snapshot has been attached to this lease agreement.');
-                    setIsCameraVisible(false);
-                  }}
-                >
-                  <View style={styles.shutterInner} />
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          </Modal>
         </View>
       </Modal>
 

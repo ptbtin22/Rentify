@@ -32,6 +32,7 @@ import { SettingsModal } from '../../components/SettingsModal';
 import { PostDetailModal } from '../../components/PostDetailModal';
 import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function TenantPortal() {
   const { local, language } = useLanguage();
@@ -462,15 +463,31 @@ export default function TenantPortal() {
 
                       <TouchableOpacity
                         style={styles.shutterButton}
-                        onPress={() => {
-                          setIsScanningLoader(true);
-                          setTimeout(() => {
-                            setIsScanningLoader(false);
-                            // Simulate successful OCR extraction
-                            setMeterKwh('235');
-                            setMeterReadingStep('breakdown');
-                            Vibration.vibrate(100);
-                          }, 1500);
+                        onPress={async () => {
+                          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                          if (status !== 'granted') {
+                            Alert.alert(
+                              language === 'vi' ? 'Quyền truy cập Camera' : 'Camera Permission Required',
+                              language === 'vi' 
+                                ? 'Cần quyền truy cập camera để chụp ảnh chỉ số đồng hồ điện.'
+                                : 'Camera access is required to scan the electricity meter.'
+                            );
+                            return;
+                          }
+                          const result = await ImagePicker.launchCameraAsync({
+                            mediaTypes: ['images'],
+                            quality: 0.8,
+                          });
+                          if (!result.canceled && result.assets.length > 0) {
+                            setIsScanningLoader(true);
+                            setTimeout(() => {
+                              setIsScanningLoader(false);
+                              // Simulate successful OCR extraction from real photo
+                              setMeterKwh('248');
+                              setMeterReadingStep('breakdown');
+                              Vibration.vibrate(100);
+                            }, 1500);
+                          }
                         }}
                       >
                         <View style={styles.shutterInner} />
