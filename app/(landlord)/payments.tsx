@@ -613,7 +613,7 @@ export default function LandlordPayments() {
                     style={styles.photoCaptureBtn}
                     onPress={() => handleAttachmentSelection('tenant')}
                   >
-                    <Text style={styles.photoCaptureText}>Capture</Text>
+                    <Text style={styles.photoCaptureText}>Upload</Text>
                   </TouchableOpacity>
                 </View>
  
@@ -628,7 +628,7 @@ export default function LandlordPayments() {
                     style={styles.photoCaptureBtn}
                     onPress={() => handleAttachmentSelection('contract')}
                   >
-                    <Text style={styles.photoCaptureText}>Capture</Text>
+                    <Text style={styles.photoCaptureText}>Upload</Text>
                   </TouchableOpacity>
                 </View>
 
