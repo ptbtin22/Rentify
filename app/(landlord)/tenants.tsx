@@ -22,12 +22,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
+import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
 import { PhoneInput } from '../../components/PhoneInput';
 import { validatePhone } from '../../services/PhoneUtils';
-
+ 
 export default function LandlordTenants() {
   const { local } = useLanguage();
+  const { adjustSize } = useEasyViewMode();
   const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -123,9 +125,9 @@ export default function LandlordTenants() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tenants</Text>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('tenants')}</Text>
         <TouchableOpacity onPress={() => setIsAddVisible(true)}>
-          <Text style={styles.addText}>➕ Add</Text>
+          <Text style={[styles.addText, { fontSize: adjustSize(14) }]}>➕ {local('add_room').replace(' phòng', '')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -137,8 +139,8 @@ export default function LandlordTenants() {
         ListEmptyComponent={
           <View style={styles.emptyView}>
             <Text style={styles.emptyIcon}>👤</Text>
-            <Text style={styles.emptyTitle}>No Tenants</Text>
-            <Text style={styles.emptyDesc}>Add your first tenant to get started.</Text>
+            <Text style={[styles.emptyTitle, { fontSize: adjustSize(16) }]}>{local('no_tenants')}</Text>
+            <Text style={[styles.emptyDesc, { fontSize: adjustSize(13) }]}>{local('add_first_tenant')}</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -150,8 +152,8 @@ export default function LandlordTenants() {
               </View>
 
               <View style={styles.details}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.email}>{item.email}</Text>
+                <Text style={[styles.name, { fontSize: adjustSize(15) }]}>{item.name}</Text>
+                <Text style={[styles.email, { fontSize: adjustSize(13) }]}>{item.email}</Text>
               </View>
 
               <View style={styles.values}>
@@ -164,10 +166,10 @@ export default function LandlordTenants() {
                   <Text
                     style={[
                       styles.statusText,
-                      { color: activeLeases.length > 0 ? '#34C759' : '#8E8E93' }
+                      { color: activeLeases.length > 0 ? '#34C759' : '#8E8E93', fontSize: adjustSize(11) }
                     ]}
                   >
-                    {activeLeases.length > 0 ? 'Leasing' : 'Inactive'}
+                    {activeLeases.length > 0 ? local('leasing') : local('inactive')}
                   </Text>
                 </View>
               </View>
@@ -182,25 +184,25 @@ export default function LandlordTenants() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsAddVisible(false)}>
-                <Text style={styles.modalCancel}>Cancel</Text>
+                <Text style={styles.modalCancel}>{local('cancel')}</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Add Tenant</Text>
+              <Text style={styles.modalTitle}>{local('add_tenant')}</Text>
               <TouchableOpacity
                 onPress={handleSave}
                 disabled={!name.trim() || validatePhone(phone, countryCode) !== null}
                 style={(!name.trim() || validatePhone(phone, countryCode) !== null) && { opacity: 0.5 }}
               >
-                <Text style={styles.modalSave}>Save</Text>
+                <Text style={styles.modalSave}>{local('save')}</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.formScroll}>
-              <Text style={styles.label}>Contact Information</Text>
+              <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('contact_info')}</Text>
               
               <View style={styles.inputBox}>
                 <TextInput
-                  style={styles.textInput}
-                  placeholder="Name"
+                  style={[styles.textInput, { fontSize: adjustSize(14) }]}
+                  placeholder={local('name')}
                   placeholderTextColor="#8E8E93"
                   value={name}
                   onChangeText={setName}
@@ -209,8 +211,8 @@ export default function LandlordTenants() {
 
               <View style={styles.inputBox}>
                 <TextInput
-                  style={styles.textInput}
-                  placeholder="Email (Optional)"
+                  style={[styles.textInput, { fontSize: adjustSize(14) }]}
+                  placeholder={local('email_optional')}
                   placeholderTextColor="#8E8E93"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -227,11 +229,11 @@ export default function LandlordTenants() {
                 onChangeCountry={setCountryCode}
               />
 
-              <Text style={styles.label}>Notes</Text>
+              <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('notes')}</Text>
               <View style={styles.notesBox}>
                 <TextInput
-                  style={styles.notesInput}
-                  placeholder="Add any notes..."
+                  style={[styles.notesInput, { fontSize: adjustSize(14) }]}
+                  placeholder={local('add_notes_placeholder')}
                   placeholderTextColor="#8E8E93"
                   multiline
                   numberOfLines={4}
@@ -252,26 +254,26 @@ export default function LandlordTenants() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setSelectedTenant(null)}>
-                  <Text style={styles.modalCancel}>Close</Text>
+                  <Text style={styles.modalCancel}>{local('close')}</Text>
                 </TouchableOpacity>
                 <Text style={styles.modalTitle}>{selectedTenant.name}</Text>
                 <View style={{ width: 50 }} />
               </View>
 
               <ScrollView style={styles.formScroll}>
-                <Text style={styles.label}>Contact Details</Text>
+                <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('contact_details')}</Text>
                 <View style={styles.detailContainer}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Name</Text>
-                    <Text style={styles.detailValue}>{selectedTenant.name}</Text>
+                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('name')}</Text>
+                    <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.name}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Email</Text>
-                    <Text style={styles.detailValue}>{selectedTenant.email}</Text>
+                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Email</Text>
+                    <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.email}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Phone</Text>
-                    <Text style={styles.detailValue}>{selectedTenant.phone || 'N/A'}</Text>
+                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('phone_number').replace(' SỐ ĐIỆN THOẠI', '').replace('PHONE NUMBER', 'Phone')}</Text>
+                    <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.phone || 'N/A'}</Text>
                   </View>
                   {selectedTenant.phone ? (
                     <TouchableOpacity
@@ -281,22 +283,22 @@ export default function LandlordTenants() {
                         Linking.openURL(`https://zalo.me/${cleanPhone}`);
                       }}
                     >
-                      <Text style={styles.zaloBtnText}>{local('chat_on_zalo')}</Text>
+                      <Text style={[styles.zaloBtnText, { fontSize: adjustSize(13) }]}>{local('chat_on_zalo')}</Text>
                     </TouchableOpacity>
                   ) : null}
                   {selectedTenant.notes ? (
                     <View style={styles.notesDetails}>
-                      <Text style={styles.notesTitle}>Notes</Text>
-                      <Text style={styles.notesBody}>{selectedTenant.notes}</Text>
+                      <Text style={[styles.notesTitle, { fontSize: adjustSize(13) }]}>{local('notes')}</Text>
+                      <Text style={[styles.notesBody, { fontSize: adjustSize(13) }]}>{selectedTenant.notes}</Text>
                     </View>
                   ) : null}
                 </View>
 
                 {/* Leases List */}
-                <Text style={styles.label}>Leases</Text>
+                <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('leases')}</Text>
                 {getTenantLeases(selectedTenant.id).length === 0 ? (
                   <View style={styles.emptyLease}>
-                    <Text style={styles.emptyLeaseText}>No active leases logged.</Text>
+                    <Text style={[styles.emptyLeaseText, { fontSize: adjustSize(13) }]}>{local('no_active_leases')}</Text>
                   </View>
                 ) : (
                   <View style={styles.leaseContainer}>

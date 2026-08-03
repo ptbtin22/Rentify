@@ -138,8 +138,8 @@ export default function LandlordDashboard() {
       {/* Top Header View */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>Welcome Back 👋</Text>
-          <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Rentify Dashboard</Text>
+          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>{local('welcome_back')}</Text>
+          <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('dashboard')}</Text>
         </View>
         <TouchableOpacity 
           style={styles.profileHeaderBtn} 
@@ -159,7 +159,7 @@ export default function LandlordDashboard() {
               setIsProfileVisible(true);
             }}
           >
-            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 View Profile</Text>
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 {local('view_profile')}</Text>
           </TouchableOpacity>
           <View style={styles.dropdownDivider} />
           <TouchableOpacity 
@@ -169,7 +169,7 @@ export default function LandlordDashboard() {
               setIsSettingsVisible(true);
             }}
           >
-            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ Settings</Text>
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ {local('settings')}</Text>
           </TouchableOpacity>
           <View style={styles.dropdownDivider} />
           <TouchableOpacity 
@@ -180,7 +180,7 @@ export default function LandlordDashboard() {
               router.replace('/login');
             }}
           >
-            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 Logout</Text>
+            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 {local('logout')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -192,34 +192,34 @@ export default function LandlordDashboard() {
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>💰</Text>
             <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.totalRevenue.toLocaleString()}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Monthly Revenue</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('monthly_revenue')}</Text>
           </View>
 
           {/* Card 2 */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>⚠️</Text>
             <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.unpaidBalance.toLocaleString()}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Unpaid Balance</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('unpaid_balance')}</Text>
           </View>
 
           {/* Card 3 */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>🏠</Text>
             <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.occupancyRate.toFixed(1)}%</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Occupancy Rate</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('occupancy_rate')}</Text>
           </View>
 
           {/* Card 4 */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>📄</Text>
             <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.activeLeasesCount}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>Active Leases</Text>
+            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('active_leases')}</Text>
           </View>
         </View>
 
         {/* ─── Landlord Quick Actions Row ─── */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>{local('quick_actions')}</Text>
           <View style={styles.actionsRow}>
             {/* Create Lease action */}
             <TouchableOpacity
@@ -252,10 +252,10 @@ export default function LandlordDashboard() {
 
         {/* Custom Progress Bar Ratio Graph */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Status Overview</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>{local('payment_overview')}</Text>
           {recentPayments.length === 0 ? (
             <View style={styles.emptyChart}>
-              <Text style={styles.emptyChartText}>No payment data available yet.</Text>
+              <Text style={[styles.emptyChartText, { fontSize: adjustSize(13) }]}>{local('no_payment_data')}</Text>
             </View>
           ) : (
             <View style={styles.ratioContainer}>
@@ -269,11 +269,11 @@ export default function LandlordDashboard() {
               <View style={styles.legendRow}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
-                  <Text style={styles.legendText}>Paid</Text>
+                  <Text style={[styles.legendText, { fontSize: adjustSize(12) }]}>{local('paid')}</Text>
                 </View>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: '#FF9500' }]} />
-                  <Text style={styles.legendText}>Pending</Text>
+                  <Text style={[styles.legendText, { fontSize: adjustSize(12) }]}>{local('pending')}</Text>
                 </View>
               </View>
             </View>
@@ -282,23 +282,23 @@ export default function LandlordDashboard() {
 
         {/* Recent Payments Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Recent Payments</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>{local('recent_payments')}</Text>
           {recentPayments.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyCardText}>No recent payments logged.</Text>
+              <Text style={[styles.emptyCardText, { fontSize: adjustSize(13) }]}>{local('no_recent_payments')}</Text>
             </View>
           ) : (
             <View style={styles.listCard}>
               {recentPayments.map((item, index) => (
                 <View key={item.id} style={styles.rowItem}>
                   <View style={styles.rowDetails}>
-                    <Text style={styles.rowPropName}>{item.propertyName}</Text>
-                    <Text style={styles.rowDate}>Due: {item.dueDate}</Text>
+                    <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.propertyName}</Text>
+                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('payment_amount').replace(':', '')}: {item.dueDate}</Text>
                   </View>
                   <View style={styles.rowValues}>
-                    <Text style={styles.rowAmount}>${item.amount.toLocaleString()}</Text>
-                    <Text style={[styles.rowStatus, { color: getStatusColor(item.status) }]}>
-                      {item.status}
+                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>${item.amount.toLocaleString()}</Text>
+                    <Text style={[styles.rowStatus, { color: getStatusColor(item.status), fontSize: adjustSize(11) }]}>
+                      {local(item.status.toLowerCase()) || item.status}
                     </Text>
                   </View>
                   {index < recentPayments.length - 1 && <View style={styles.rowDivider} />}
@@ -315,39 +315,39 @@ export default function LandlordDashboard() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsReportVisible(false)}>
-                <Text style={styles.modalCancel}>Close</Text>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Revenue & Reports</Text>
+              <Text style={styles.modalTitle}>{local('revenue_reports')}</Text>
               <View style={{ width: 50 }} />
             </View>
 
             <ScrollView style={styles.modalScroll}>
-              <Text style={styles.modalSectionLabel}>Overview Analysis</Text>
+              <Text style={styles.modalSectionLabel}>{local('overview_analysis')}</Text>
               
               <View style={styles.reportSummaryCard}>
                 <View style={styles.reportRow}>
-                  <Text style={styles.reportLabel}>Collected Income (Paid):</Text>
+                  <Text style={styles.reportLabel}>{local('collected_income')}</Text>
                   <Text style={[styles.reportValue, { color: '#34C759' }]}>
                     ${metrics.totalRevenue.toLocaleString()}
                   </Text>
                 </View>
                 <View style={styles.reportRow}>
-                  <Text style={styles.reportLabel}>Outstanding Invoices (Pending):</Text>
+                  <Text style={styles.reportLabel}>{local('outstanding_invoices')}</Text>
                   <Text style={[styles.reportValue, { color: '#FF9500' }]}>
                     ${metrics.unpaidBalance.toLocaleString()}
                   </Text>
                 </View>
                 <View style={styles.reportRow}>
-                  <Text style={styles.reportLabel}>Total Projected Income:</Text>
+                  <Text style={styles.reportLabel}>{local('total_projected')}</Text>
                   <Text style={[styles.reportValue, { fontWeight: '800' }]}>
                     ${(metrics.totalRevenue + metrics.unpaidBalance).toLocaleString()}
                   </Text>
                 </View>
               </View>
 
-              <Text style={styles.modalSectionLabel}>Monthly Projections</Text>
+              <Text style={styles.modalSectionLabel}>{local('monthly_projections')}</Text>
               <View style={styles.chartMockContainer}>
-                <Text style={styles.chartTitle}>Average Rent Breakdown</Text>
+                <Text style={styles.chartTitle}>{local('average_rent_breakdown')}</Text>
                 <View style={styles.barItem}>
                   <Text style={styles.barLabel}>Aug 2026</Text>
                   <View style={styles.barTrack}>

@@ -221,7 +221,7 @@ export default function LandlordNotices() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header View */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{local('announcements')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('announcements')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.configActionBtn} 
