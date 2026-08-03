@@ -33,6 +33,7 @@ import { PostDetailModal } from '../../components/PostDetailModal';
 import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function TenantPortal() {
   const { local, language } = useLanguage();
@@ -464,29 +465,83 @@ export default function TenantPortal() {
                       <TouchableOpacity
                         style={styles.shutterButton}
                         onPress={async () => {
-                          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                          if (status !== 'granted') {
-                            Alert.alert(
-                              language === 'vi' ? 'Quyền truy cập Camera' : 'Camera Permission Required',
-                              language === 'vi' 
-                                ? 'Cần quyền truy cập camera để chụp ảnh chỉ số đồng hồ điện.'
-                                : 'Camera access is required to scan the electricity meter.'
-                            );
-                            return;
-                          }
-                          const result = await ImagePicker.launchCameraAsync({
-                            mediaTypes: ['images'],
-                            quality: 0.8,
-                          });
-                          if (!result.canceled && result.assets.length > 0) {
+                          const triggerOCR = () => {
                             setIsScanningLoader(true);
                             setTimeout(() => {
                               setIsScanningLoader(false);
-                              // Simulate successful OCR extraction from real photo
                               setMeterKwh('248');
                               setMeterReadingStep('breakdown');
                               Vibration.vibrate(100);
                             }, 1500);
+                          };
+
+                          const launchCamera = async () => {
+                            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                            if (status !== 'granted') {
+                              Alert.alert('Permission Required', 'Camera access is needed.');
+                              return;
+                            }
+                            const result = await ImagePicker.launchCameraAsync({
+                              mediaTypes: ['images'],
+                              quality: 0.8,
+                            });
+                            if (!result.canceled && result.assets.length > 0) {
+                              triggerOCR();
+                            }
+                          };
+
+                          const launchLibrary = async () => {
+                            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                            if (status !== 'granted') {
+                              Alert.alert('Permission Required', 'Photo library access is needed.');
+                              return;
+                            }
+                            const result = await ImagePicker.launchImageLibraryAsync({
+                              mediaTypes: ['images'],
+                              quality: 0.8,
+                            });
+                            if (!result.canceled && result.assets.length > 0) {
+                              triggerOCR();
+                            }
+                          };
+
+                          const launchFilePicker = async () => {
+                            try {
+                              const result = await DocumentPicker.getDocumentAsync({
+                                type: ['image/*', 'application/pdf'],
+                                copyToCacheDirectory: true
+                              });
+                              if (!result.canceled && result.assets.length > 0) {
+                                triggerOCR();
+                              }
+                            } catch (err) {
+                              console.log('File picker error: ', err);
+                            }
+                          };
+
+                          if (Platform.OS === 'ios') {
+                            ActionSheetIOS.showActionSheetWithOptions(
+                              {
+                                options: ['Cancel', 'Take Photo', 'Choose from Photo Library', 'Browse Files'],
+                                cancelButtonIndex: 0
+                              },
+                              (buttonIndex) => {
+                                if (buttonIndex === 1) launchCamera();
+                                else if (buttonIndex === 2) launchLibrary();
+                                else if (buttonIndex === 3) launchFilePicker();
+                              }
+                            );
+                          } else {
+                            Alert.alert(
+                              'Select Meter Photo Source',
+                              'Choose how you want to upload the meter photo:',
+                              [
+                                { text: 'Take Photo', onPress: launchCamera },
+                                { text: 'Photo Library', onPress: launchLibrary },
+                                { text: 'Browse Files', onPress: launchFilePicker },
+                                { text: 'Cancel', style: 'cancel' }
+                              ]
+                            );
                           }
                         }}
                       >

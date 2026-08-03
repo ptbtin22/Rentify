@@ -22,7 +22,8 @@ import {
   UIManager,
   Platform,
   Animated,
-  Vibration
+  Vibration,
+  ActionSheetIOS
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ import { useLanguage } from '../../services/LanguageManager';
 import { useElderlyMode } from '../../services/AccessibilityManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 // Helper: format Date → "YYYY-MM-DD" string for storage
 const formatDate = (date: Date): string => {
@@ -91,24 +93,87 @@ export default function LandlordPayments() {
   const [tenantPhoto, setTenantPhoto] = useState<string | undefined>(undefined);
   const [contractPhoto, setContractPhoto] = useState<string | undefined>(undefined);
 
-  const handleCapturePhoto = async (mode: 'tenant' | 'contract') => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Camera access is needed to capture photos.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: mode === 'tenant' ? [1, 1] : [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      if (mode === 'tenant') setTenantPhoto(uri);
-      else setContractPhoto(uri);
-      Vibration.vibrate(100);
-      Alert.alert('Photo Captured', 'Document snapshot has been attached to this lease agreement.');
+  const handleAttachmentSelection = async (mode: 'tenant' | 'contract') => {
+    const launchCamera = async () => {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera access is needed to capture photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: mode === 'tenant' ? [1, 1] : [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        if (mode === 'tenant') setTenantPhoto(uri);
+        else setContractPhoto(uri);
+        Vibration.vibrate(100);
+      }
+    };
+
+    const launchLibrary = async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Photo library access is needed.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: mode === 'tenant' ? [1, 1] : [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        if (mode === 'tenant') setTenantPhoto(uri);
+        else setContractPhoto(uri);
+        Vibration.vibrate(100);
+      }
+    };
+
+    const launchFilePicker = async () => {
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: ['image/*', 'application/pdf'],
+          copyToCacheDirectory: true
+        });
+        if (!result.canceled && result.assets.length > 0) {
+          const uri = result.assets[0].uri;
+          if (mode === 'tenant') setTenantPhoto(uri);
+          else setContractPhoto(uri);
+          Vibration.vibrate(100);
+        }
+      } catch (err) {
+        console.log('Document pick error: ', err);
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Photo Library', 'Browse Files'],
+          cancelButtonIndex: 0
+        },
+        (buttonIndex: number) => {
+          if (buttonIndex === 1) launchCamera();
+          else if (buttonIndex === 2) launchLibrary();
+          else if (buttonIndex === 3) launchFilePicker();
+        }
+      );
+    } else {
+      Alert.alert(
+        'Select Attachment Source',
+        'Choose how you want to upload the document:',
+        [
+          { text: 'Take Photo', onPress: launchCamera },
+          { text: 'Photo Library', onPress: launchLibrary },
+          { text: 'Browse Files', onPress: launchFilePicker },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
     }
   };
 
@@ -546,7 +611,7 @@ export default function LandlordPayments() {
                   </View>
                   <TouchableOpacity
                     style={styles.photoCaptureBtn}
-                    onPress={() => handleCapturePhoto('tenant')}
+                    onPress={() => handleAttachmentSelection('tenant')}
                   >
                     <Text style={styles.photoCaptureText}>Capture</Text>
                   </TouchableOpacity>
@@ -561,7 +626,7 @@ export default function LandlordPayments() {
                   </View>
                   <TouchableOpacity
                     style={styles.photoCaptureBtn}
-                    onPress={() => handleCapturePhoto('contract')}
+                    onPress={() => handleAttachmentSelection('contract')}
                   >
                     <Text style={styles.photoCaptureText}>Capture</Text>
                   </TouchableOpacity>
