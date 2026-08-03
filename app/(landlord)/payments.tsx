@@ -605,8 +605,8 @@ export default function LandlordPayments() {
                 <View style={styles.photoRow}>
                   <View style={styles.photoInfo}>
                     <Text style={styles.rowLabel}>Tenant Photo</Text>
-                    <Text style={styles.photoStatus}>
-                      {tenantPhoto ? '✅ Uploaded' : '❌ Missing'}
+                    <Text style={[styles.photoStatus, { color: tenantPhoto ? '#34C759' : '#FF3B30' }]}>
+                      {tenantPhoto ? 'Uploaded' : 'Missing'}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -620,8 +620,8 @@ export default function LandlordPayments() {
                 <View style={styles.photoRow}>
                   <View style={styles.photoInfo}>
                     <Text style={styles.rowLabel}>Signed Contract</Text>
-                    <Text style={styles.photoStatus}>
-                      {contractPhoto ? '✅ Uploaded' : '❌ Missing'}
+                    <Text style={[styles.photoStatus, { color: contractPhoto ? '#34C759' : '#FF3B30' }]}>
+                      {contractPhoto ? 'Uploaded' : 'Missing'}
                     </Text>
                   </View>
                   <TouchableOpacity
