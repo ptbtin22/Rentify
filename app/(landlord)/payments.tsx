@@ -606,7 +606,7 @@ export default function LandlordPayments() {
                   <View style={styles.photoInfo}>
                     <Text style={styles.rowLabel}>Tenant Photo</Text>
                     <Text style={styles.photoStatus}>
-                      {tenantPhoto ? '✅ Captured' : '❌ Missing'}
+                      {tenantPhoto ? '✅ Uploaded' : '❌ Missing'}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -621,7 +621,7 @@ export default function LandlordPayments() {
                   <View style={styles.photoInfo}>
                     <Text style={styles.rowLabel}>Signed Contract</Text>
                     <Text style={styles.photoStatus}>
-                      {contractPhoto ? '✅ Captured' : '❌ Missing'}
+                      {contractPhoto ? '✅ Uploaded' : '❌ Missing'}
                     </Text>
                   </View>
                   <TouchableOpacity
