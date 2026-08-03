@@ -17,7 +17,7 @@ import {
   Platform,
   ActionSheetIOS
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
@@ -33,6 +33,7 @@ export default function LandlordDashboard() {
   const router = useRouter();
   const { logout } = useAuth();
   const { local } = useLanguage();
+  const insets = useSafeAreaInsets();
 
   // Metrics state
   const [metrics, setMetrics] = useState({
@@ -312,7 +313,7 @@ export default function LandlordDashboard() {
       {/* ─── Premium Revenue Report Modal ─── */}
       <Modal visible={isReportVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingTop: insets.top }]}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsReportVisible(false)}>
                 <Text style={styles.modalCancel}>{local('close')}</Text>
