@@ -19,7 +19,9 @@ import {
   Modal,
   ActivityIndicator,
   Vibration,
-  TextInput
+  TextInput,
+  Image,
+  AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -32,6 +34,7 @@ import { SettingsModal } from '../../components/SettingsModal';
 import { PostDetailModal } from '../../components/PostDetailModal';
 import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
+import { formatVND } from '../../services/CurrencyUtils';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
  
@@ -60,6 +63,50 @@ export default function TenantPortal() {
   const [meterKwh, setMeterKwh] = useState('');
   const [isScanningLoader, setIsScanningLoader] = useState(false);
   const [currentPaymentForBilling, setCurrentPaymentForBilling] = useState<Payment | null>(null);
+  
+  const [waitingForPaymentReturn, setWaitingForPaymentReturn] = useState(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (waitingForPaymentReturn && nextAppState === 'active') {
+        setWaitingForPaymentReturn(false);
+        const finalAmount =
+          (activeLease?.monthlyRent ?? 0) +
+          (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+          (property?.waterRate ?? 0) +
+          (property?.serviceFee ?? 0);
+
+        if (currentPaymentForBilling) {
+          Database.updatePaymentAmountAndStatus(
+            currentPaymentForBilling.id,
+            finalAmount,
+            'Paid'
+          );
+        }
+
+        Vibration.vibrate([0, 100, 50, 100]);
+        Alert.alert(local('payment_confirmed'), local('payment_confirmed_desc'));
+        setIsMeterModalVisible(false);
+        setMeterReadingStep('scan');
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [waitingForPaymentReturn, activeLease, meterKwh, property, currentPaymentForBilling, local]);
+
+  const initiateMockPayment = (url?: string, fallback?: string) => {
+    if (url) {
+      Linking.openURL(url).catch(() => {
+        if (fallback) Linking.openURL(fallback);
+      });
+      setWaitingForPaymentReturn(true);
+    } else {
+      Linking.openURL('https://my.vnpay.com.vn/').catch(() => {});
+      setWaitingForPaymentReturn(true);
+    }
+  };
 
   const getPendingBill = () => {
     return tenantPayments.find(p => p.status === 'Pending') || null;
@@ -254,28 +301,28 @@ export default function TenantPortal() {
 
           <View style={styles.leaseDetails}>
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Rental Address</Text>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('rental_address')}</Text>
               <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 {property ? property.address : '456 Greenway Blvd, Room 202'}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Monthly Rent</Text>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('monthly_rent')}</Text>
               <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
-                ${activeLease ? activeLease.monthlyRent.toLocaleString() : '1,200'}
+                {activeLease ? formatVND(activeLease.monthlyRent) : formatVND(3500000)}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Security Deposit</Text>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('security_deposit')}</Text>
               <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
-                ${activeLease ? activeLease.securityDeposit.toLocaleString() : '1,200'}
+                {activeLease ? formatVND(activeLease.securityDeposit) : formatVND(3500000)}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Lease Duration</Text>
+              <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('lease_duration')}</Text>
               <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 {activeLease
                   ? `${activeLease.startDate} - ${activeLease.endDate}`
@@ -320,7 +367,7 @@ export default function TenantPortal() {
 
         {/* ─── Billing Action Banner (Missing MVP requirement) ─── */}
         {getPendingBill() ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.billingBanner}
             onPress={() => {
               setCurrentPaymentForBilling(getPendingBill());
@@ -344,9 +391,8 @@ export default function TenantPortal() {
           </TouchableOpacity>
         ) : null}
 
-        {/* ─── Tenant Quick Actions & Links ─── */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Quick Links</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>{local('quick_links')}</Text>
           <View style={styles.quickLinksRow}>
             {/* View contract */}
             <TouchableOpacity style={styles.linkCard} onPress={() => setIsContractVisible(true)}>
@@ -355,16 +401,16 @@ export default function TenantPortal() {
             </TouchableOpacity>
 
             {/* Contact Landlord */}
-            <TouchableOpacity 
-              style={styles.linkCard} 
+            <TouchableOpacity
+              style={styles.linkCard}
               onPress={() => {
                 Alert.alert(
-                  'Liên Hệ Chủ Nhà',
-                  'Số điện thoại: 0901234567\nBạn muốn nhắn tin qua Zalo hay gọi điện trực tiếp?',
+                  local('contact_landlord'),
+                  '0901234567',
                   [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Nhắn Zalo', onPress: () => Linking.openURL('https://zalo.me/0901234567') },
-                    { text: 'Gọi Điện', onPress: () => Linking.openURL('tel:0901234567') }
+                    { text: local('cancel'), style: 'cancel' },
+                    { text: 'Zalo', onPress: () => Linking.openURL('https://zalo.me/0901234567') },
+                    { text: language === 'vi' ? 'Gọi điện' : 'Call', onPress: () => Linking.openURL('tel:0901234567').catch(() => Alert.alert(local('error') || 'Error', 'Phone calls are not supported on this simulator.')) }
                   ]
                 );
               }}
@@ -377,23 +423,23 @@ export default function TenantPortal() {
 
         {/* Payments List Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>Your Rent Payments</Text>
+          <Text style={[styles.sectionTitle, { fontSize: adjustSize(17) }]}>{local('your_payments')}</Text>
           {tenantPayments.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyCardText}>No payment history logged.</Text>
+              <Text style={styles.emptyCardText}>{local('no_payment_history_tenant')}</Text>
             </View>
           ) : (
             <View style={styles.listCard}>
               {tenantPayments.map((item, index) => (
                 <View key={item.id} style={styles.rowItem}>
                   <View style={styles.rowDetails}>
-                    <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.notes || 'Rent Invoice'}</Text>
-                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>Due: {item.dueDate}</Text>
+                    <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.notes || local('your_payments')}</Text>
+                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('due_label')} {item.dueDate}</Text>
                   </View>
                   <View style={styles.rowValues}>
-                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>${item.amount.toLocaleString()}</Text>
+                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>{formatVND(item.amount)}</Text>
                     <Text style={[styles.rowStatus, { color: getStatusColor(item.status), fontSize: adjustSize(11) }]}>
-                      {item.status}
+                      {item.status === 'Paid' ? local('filter_paid') : local('filter_pending')}
                     </Text>
                   </View>
                   {index < tenantPayments.length - 1 && <View style={styles.rowDivider} />}
@@ -406,7 +452,7 @@ export default function TenantPortal() {
       {/* ─── Meter reading, OCR extraction & QR pay flow ─── */}
       <Modal visible={isMeterModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { height: '92%' }]}>
             
             {/* Header */}
             <View style={styles.modalHeader}>
@@ -441,55 +487,27 @@ export default function TenantPortal() {
 
                     {/* Camera Control Footer */}
                     <View style={styles.cameraControls}>
+
+                      {/* Shutter Button -> Trigger Mock Scan Directly */}
                       <TouchableOpacity
-                        style={[styles.secondaryScanBtn, { marginRight: 20 }]}
+                        style={styles.shutterButton}
                         onPress={() => {
                           setIsScanningLoader(true);
                           setTimeout(() => {
                             setIsScanningLoader(false);
-                            Vibration.vibrate(120);
-                            Alert.alert(
-                              language === 'vi' ? 'OCR Thất Bại' : 'OCR Scanning Failed',
-                              language === 'vi' 
-                                ? 'Không thể nhận diện chỉ số từ ảnh chụp. Vui lòng nhập tay chỉ số điện.'
-                                : 'Could not extract value from photo. Please enter electricity usage manually.'
-                            );
-                            setMeterKwh('');
+                            setMeterKwh('248');
                             setMeterReadingStep('breakdown');
-                          }, 1000);
+                            Vibration.vibrate(100);
+                          }, 1500);
                         }}
                       >
-                        <Text style={styles.secondaryScanText}>Manual</Text>
+                        <View style={styles.shutterInner} />
                       </TouchableOpacity>
 
+                      {/* Gallery Button */}
                       <TouchableOpacity
-                        style={styles.shutterButton}
+                        style={[styles.secondaryScanBtn, { position: 'absolute', right: 30 }]}
                         onPress={async () => {
-                          const triggerOCR = () => {
-                            setIsScanningLoader(true);
-                            setTimeout(() => {
-                              setIsScanningLoader(false);
-                              setMeterKwh('248');
-                              setMeterReadingStep('breakdown');
-                              Vibration.vibrate(100);
-                            }, 1500);
-                          };
-
-                          const launchCamera = async () => {
-                            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                            if (status !== 'granted') {
-                              Alert.alert('Permission Required', 'Camera access is needed.');
-                              return;
-                            }
-                            const result = await ImagePicker.launchCameraAsync({
-                              mediaTypes: ['images'],
-                              quality: 0.8,
-                            });
-                            if (!result.canceled && result.assets.length > 0) {
-                              triggerOCR();
-                            }
-                          };
-
                           const launchLibrary = async () => {
                             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                             if (status !== 'granted') {
@@ -501,7 +519,13 @@ export default function TenantPortal() {
                               quality: 0.8,
                             });
                             if (!result.canceled && result.assets.length > 0) {
-                              triggerOCR();
+                              setIsScanningLoader(true);
+                              setTimeout(() => {
+                                setIsScanningLoader(false);
+                                setMeterKwh('248');
+                                setMeterReadingStep('breakdown');
+                                Vibration.vibrate(100);
+                              }, 1500);
                             }
                           };
 
@@ -512,7 +536,13 @@ export default function TenantPortal() {
                                 copyToCacheDirectory: true
                               });
                               if (!result.canceled && result.assets.length > 0) {
-                                triggerOCR();
+                                setIsScanningLoader(true);
+                                setTimeout(() => {
+                                  setIsScanningLoader(false);
+                                  setMeterKwh('248');
+                                  setMeterReadingStep('breakdown');
+                                  Vibration.vibrate(100);
+                                }, 1500);
                               }
                             } catch (err) {
                               console.log('File picker error: ', err);
@@ -522,13 +552,12 @@ export default function TenantPortal() {
                           if (Platform.OS === 'ios') {
                             ActionSheetIOS.showActionSheetWithOptions(
                               {
-                                options: ['Cancel', 'Take Photo', 'Choose from Photo Library', 'Browse Files'],
+                                options: ['Cancel', 'Photo Library', 'Browse Files'],
                                 cancelButtonIndex: 0
                               },
                               (buttonIndex) => {
-                                if (buttonIndex === 1) launchCamera();
-                                else if (buttonIndex === 2) launchLibrary();
-                                else if (buttonIndex === 3) launchFilePicker();
+                                if (buttonIndex === 1) launchLibrary();
+                                else if (buttonIndex === 2) launchFilePicker();
                               }
                             );
                           } else {
@@ -536,7 +565,6 @@ export default function TenantPortal() {
                               'Select Meter Photo Source',
                               'Choose how you want to upload the meter photo:',
                               [
-                                { text: 'Take Photo', onPress: launchCamera },
                                 { text: 'Photo Library', onPress: launchLibrary },
                                 { text: 'Browse Files', onPress: launchFilePicker },
                                 { text: 'Cancel', style: 'cancel' }
@@ -545,7 +573,7 @@ export default function TenantPortal() {
                           }
                         }}
                       >
-                        <View style={styles.shutterInner} />
+                        <Text style={styles.secondaryScanText}>Gallery</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -577,33 +605,33 @@ export default function TenantPortal() {
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>{local('base_rent')}</Text>
                     <Text style={styles.breakdownValue}>
-                      ${activeLease ? activeLease.monthlyRent.toLocaleString() : '0'}
-                    </Text>
-                  </View>
-                  
-                  {/* Electricity unit price: property.electricityRate VND / 25000 = USD */}
-                  <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>
-                      Tiền điện ({Number(meterKwh || 0)} kWh × ${property ? (property.electricityRate / 25000).toFixed(2) : '0.14'})
-                    </Text>
-                    <Text style={styles.breakdownValue}>
-                      ${((Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14))).toFixed(2)}
+                      {activeLease ? formatVND(activeLease.monthlyRent) : formatVND(0)}
                     </Text>
                   </View>
 
-                  {/* Water flat rate: property.waterRate VND / 25000 = USD */}
+                  {/* Electricity: kWh × rate (both in VND) */}
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>
+                      {language === 'vi' ? 'Tiền điện' : 'Electricity'} ({Number(meterKwh || 0)} kWh × {formatVND(property?.electricityRate ?? 3500)}/kWh)
+                    </Text>
+                    <Text style={styles.breakdownValue}>
+                      {formatVND(Number(meterKwh || 0) * (property?.electricityRate ?? 3500))}
+                    </Text>
+                  </View>
+
+                  {/* Water flat rate in VND */}
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>{local('water_bill')}</Text>
                     <Text style={styles.breakdownValue}>
-                      ${property ? (property.waterRate / 25000).toFixed(2) : '0.00'}
+                      {formatVND(property?.waterRate ?? 0)}
                     </Text>
                   </View>
 
-                  {/* Service flat rate: property.serviceFee VND / 25000 = USD */}
+                  {/* Service flat rate in VND */}
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>{local('services_bill')}</Text>
                     <Text style={styles.breakdownValue}>
-                      ${property ? (property.serviceFee / 25000).toFixed(2) : '0.00'}
+                      {formatVND(property?.serviceFee ?? 0)}
                     </Text>
                   </View>
 
@@ -612,12 +640,12 @@ export default function TenantPortal() {
                   <View style={styles.breakdownRowTotal}>
                     <Text style={styles.breakdownLabelTotal}>{local('grand_total')}</Text>
                     <Text style={styles.breakdownValueTotal}>
-                      ${(
-                        (activeLease ? activeLease.monthlyRent : 0) +
-                        (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
-                        (property ? property.waterRate / 25000 : 0) +
-                        (property ? property.serviceFee / 25000 : 0)
-                      ).toFixed(2)}
+                      {formatVND(
+                        (activeLease?.monthlyRent ?? 0) +
+                        (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+                        (property?.waterRate ?? 0) +
+                        (property?.serviceFee ?? 0)
+                      )}
                     </Text>
                   </View>
                 </View>
@@ -640,7 +668,7 @@ export default function TenantPortal() {
                 </Text>
 
                 {/* Mock QR graphic */}
-                <View style={styles.qrGraphicCard}>
+                <TouchableOpacity activeOpacity={0.9} style={styles.qrGraphicCard} onPress={() => initiateMockPayment()}>
                   <View style={styles.qrTopHeader}>
                     <Text style={styles.qrBrand}>VietQR</Text>
                     <Text style={styles.qrBankName}>MB Bank</Text>
@@ -658,15 +686,15 @@ export default function TenantPortal() {
                   <View style={styles.qrAmountRow}>
                     <Text style={styles.qrAmountLabel}>{local('payment_amount')}</Text>
                     <Text style={styles.qrAmountValue}>
-                      ${(
-                        (activeLease ? activeLease.monthlyRent : 0) +
-                        (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
-                        (property ? property.waterRate / 25000 : 0) +
-                        (property ? property.serviceFee / 25000 : 0)
-                      ).toFixed(2)}
+                      {formatVND(
+                        (activeLease?.monthlyRent ?? 0) +
+                        (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+                        (property?.waterRate ?? 0) +
+                        (property?.serviceFee ?? 0)
+                      )}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 {/* Details layout */}
                 <View style={styles.transferDetailCard}>
@@ -686,27 +714,32 @@ export default function TenantPortal() {
                   </View>
                 </View>
 
+                {/* Bank app deep-link buttons */}
+                <Text style={{ fontSize: 13, color: '#8E8E93', marginTop: 16, marginBottom: 8, textAlign: 'center' }}>
+                  {local('open_bank_app')}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 12 }}>
+                  {[
+                    { label: 'MB Bank', url: 'mbmobile://', fallback: 'https://apps.apple.com/vn/app/mb-bank/id1492405498' },
+                    { label: 'VCB', url: 'vcbdigibank://', fallback: 'https://apps.apple.com/vn/app/vcb-digibank/id898009008' },
+                    { label: 'MoMo', url: 'momo://', fallback: 'https://apps.apple.com/vn/app/momo-vi-ti%E1%BB%87n/id918751511' }
+                  ].map(bank => (
+                    <TouchableOpacity
+                      key={bank.label}
+                      style={{ backgroundColor: '#007AFF15', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: '#007AFF33' }}
+                      onPress={() => {
+                        initiateMockPayment(bank.url, bank.fallback);
+                      }}
+                    >
+                      <Text style={{ color: '#007AFF', fontWeight: '700', fontSize: 13 }}>{bank.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
                 <TouchableOpacity
                   style={styles.confirmPayBtn}
                   onPress={() => {
-                    const finalAmount = (
-                      (activeLease ? activeLease.monthlyRent : 0) +
-                      (Number(meterKwh || 0) * (property ? property.electricityRate / 25000 : 0.14)) +
-                      (property ? property.waterRate / 25000 : 0) +
-                      (property ? property.serviceFee / 25000 : 0)
-                    );
-                    
-                    if (currentPaymentForBilling) {
-                      Database.updatePaymentAmountAndStatus(
-                        currentPaymentForBilling.id,
-                        finalAmount,
-                        'Paid'
-                      );
-                    }
-                    
-                    Vibration.vibrate([0, 100, 50, 100]);
-                    Alert.alert(local('payment_success'), local('payment_success_desc'));
-                    setIsMeterModalVisible(false);
+                    initiateMockPayment();
                   }}
                 >
                   <Text style={styles.confirmPayBtnText}>{local('confirm_transferred')}</Text>
@@ -747,30 +780,45 @@ export default function TenantPortal() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsContractVisible(false)}>
-                <Text style={styles.modalCancel}>Close</Text>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Lease Contract Document</Text>
+              <Text style={styles.modalTitle}>{local('rental_agreement')}</Text>
               <View style={{ width: 50 }} />
             </View>
 
             <ScrollView style={styles.modalScroll} contentContainerStyle={{ alignItems: 'center' }}>
-              <Text style={styles.contractLabel}>Signed Lease Agreement</Text>
+              <Text style={styles.contractLabel}>{local('rental_agreement')}</Text>
               <View style={styles.documentMock}>
-                <Text style={styles.docHeader}>RENTAL AGREEMENT</Text>
+                <Text style={styles.docHeader}>{local('rental_agreement').toUpperCase()}</Text>
                 <Text style={styles.docBody}>
-                  This Lease Agreement is entered into between Landlord and Resident Jane Tenant for rental unit: 
-                  {"\n\n"}{property ? property.name : 'Oakridge Apartment'}
-                  {"\n\n"}Terms:
-                  {"\n"}- Monthly rent: ${activeLease ? activeLease.monthlyRent : '1,200'}
-                  {"\n"}- Security deposit: ${activeLease ? activeLease.securityDeposit : '1,200'}
-                  {"\n"}- Duration: {activeLease ? activeLease.startDate : '2026-08-01'} to {activeLease ? activeLease.endDate : '2027-07-31'}
-                  {"\n\n"}Signed & Sealed under Rentify Security.
+                  {language === 'vi'
+                    ? `Hợp đồng này được ký giữa Chủ Nhà và Cư dân cho phòng:`
+                    : 'This Lease Agreement is entered into between Landlord and Resident for rental unit:'}
+                  {'\n\n'}{property ? property.name : 'Phòng'}
+                  {'\n\n'}{language === 'vi' ? 'Điều khoản:' : 'Terms:'}
+                  {'\n'}- {local('monthly_rent')}: {activeLease ? formatVND(activeLease.monthlyRent) : formatVND(3500000)}
+                  {'\n'}- {local('security_deposit')}: {activeLease ? formatVND(activeLease.securityDeposit) : formatVND(3500000)}
+                  {'\n'}- {local('lease_duration')}: {activeLease ? `${activeLease.startDate} – ${activeLease.endDate}` : '2026-08-01 – 2027-07-31'}
+                  {'\n\n'}{language === 'vi' ? 'Được ký và niêm phong bởi Rentify Security.' : 'Signed & Sealed under Rentify Security.'}
                 </Text>
                 <View style={styles.docSignatures}>
-                  <Text style={styles.signatureText}>Landlord: [Signed]</Text>
-                  <Text style={styles.signatureText}>Tenant: [Signed]</Text>
+                  <Text style={styles.signatureText}>{language === 'vi' ? 'Chủ nhà: [Đã ký]' : 'Landlord: [Signed]'}</Text>
+                  <Text style={styles.signatureText}>{language === 'vi' ? 'Người thuê: [Đã ký]' : 'Tenant: [Signed]'}</Text>
                 </View>
               </View>
+
+              {/* Contract photo */}
+              {activeLease?.contractPhoto ? (
+                <View style={{ width: '100%', marginTop: 16 }}>
+                  <Text style={[styles.contractLabel, { marginBottom: 8 }]}>{local('contract_photo_label')}</Text>
+                  <Image
+                    source={{ uri: activeLease.contractPhoto }}
+                    style={{ width: '100%', height: 220, borderRadius: 12, resizeMode: 'cover' }}
+                  />
+                </View>
+              ) : (
+                <Text style={{ color: '#8E8E93', fontSize: 13, marginTop: 12 }}>{local('no_contract_photo')}</Text>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1038,9 +1086,7 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: '#FFF',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 40
+    justifyContent: 'center'
   },
   shutterInner: {
     width: 56,
@@ -1050,7 +1096,11 @@ const styles = StyleSheet.create({
   },
   cameraControls: {
     backgroundColor: '#000',
-    paddingVertical: 20
+    paddingVertical: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 50
   },
   sectionLabel: {
     fontSize: 11,

@@ -8,8 +8,10 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../../services/LanguageManager';
 
 export default function TenantLayout() {
+  const { local } = useLanguage();
   return (
     <Tabs
       screenOptions={{
@@ -26,7 +28,7 @@ export default function TenantLayout() {
       <Tabs.Screen
         name="portal"
         options={{
-          title: 'Home',
+          title: local('home') || 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           )
@@ -35,9 +37,18 @@ export default function TenantLayout() {
       <Tabs.Screen
         name="notices"
         options={{
-          title: 'Bulletin',
+          title: local('bulletin') || 'Bulletin',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications" size={size} color={color} />
+          )
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: local('community_tab') || 'Community',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
           )
         }}
       />

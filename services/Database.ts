@@ -93,13 +93,13 @@ let properties: Property[] = [
     name: 'Phòng 202',
     address: '456 Greenway Blvd, Room 202',
     propertyType: 'Apartment',
-    rentAmount: 1200,
+    rentAmount: 3500000,
     bedrooms: 2,
     bathrooms: 1,
     isOccupied: true,
-    electricityRate: 3500,
-    waterRate: 100000,
-    serviceFee: 50000
+    electricityRate: 3500,      // VND per kWh
+    waterRate: 100000,           // VND flat per month
+    serviceFee: 50000            // VND flat per month
   },
   {
     id: 'prop-2',
@@ -107,7 +107,7 @@ let properties: Property[] = [
     name: 'Căn A',
     address: '128 Pinecrest Ave',
     propertyType: 'House',
-    rentAmount: 2500,
+    rentAmount: 6000000,
     bedrooms: 4,
     bathrooms: 2,
     isOccupied: false,
@@ -121,8 +121,50 @@ let properties: Property[] = [
     name: 'Phòng 104',
     address: '456 Greenway Blvd, Room 104',
     propertyType: 'Apartment',
-    rentAmount: 1100,
+    rentAmount: 2800000,
     bedrooms: 1,
+    bathrooms: 1,
+    isOccupied: true,
+    electricityRate: 3500,
+    waterRate: 100000,
+    serviceFee: 50000
+  },
+  {
+    id: 'prop-4',
+    khuTroId: 'khu-1',
+    name: 'Phòng 105',
+    address: '456 Greenway Blvd, Room 105',
+    propertyType: 'Apartment',
+    rentAmount: 3000000,
+    bedrooms: 1,
+    bathrooms: 1,
+    isOccupied: true,
+    electricityRate: 3500,
+    waterRate: 100000,
+    serviceFee: 50000
+  },
+  {
+    id: 'prop-5',
+    khuTroId: 'khu-1',
+    name: 'Phòng 203',
+    address: '456 Greenway Blvd, Room 203',
+    propertyType: 'Apartment',
+    rentAmount: 3200000,
+    bedrooms: 1,
+    bathrooms: 1,
+    isOccupied: true,
+    electricityRate: 3500,
+    waterRate: 100000,
+    serviceFee: 50000
+  },
+  {
+    id: 'prop-6',
+    khuTroId: 'khu-1',
+    name: 'Phòng 205',
+    address: '456 Greenway Blvd, Room 205',
+    propertyType: 'Apartment',
+    rentAmount: 3500000,
+    bedrooms: 2,
     bathrooms: 1,
     isOccupied: true,
     electricityRate: 3500,
@@ -147,6 +189,20 @@ let tenants: Tenant[] = [
     phone: '987654321',
     notes: 'Interested in house viewings.',
     password: '123456'
+  },
+  {
+    id: 'tenant-3',
+    name: 'Alice Smith',
+    email: 'alice@example.com',
+    phone: '0912345678',
+    password: '123456'
+  },
+  {
+    id: 'tenant-4',
+    name: 'Bob Johnson',
+    email: 'bob@example.com',
+    phone: '0987654321',
+    password: '123456'
   }
 ];
 
@@ -156,10 +212,10 @@ let leases: Lease[] = [
     id: 'lease-1',
     propertyId: 'prop-1',
     tenantId: 'tenant-1',
-    startDate: '2026-08-01',
-    endDate: '2027-07-31',
-    monthlyRent: 1200,
-    securityDeposit: 1200,
+    startDate: '2026-06-01',
+    endDate: '2026-08-25',   // Expiring soon (< 30 days) for demo
+    monthlyRent: 3500000,
+    securityDeposit: 3500000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
@@ -168,58 +224,93 @@ let leases: Lease[] = [
     id: 'lease-2',
     propertyId: 'prop-3',
     tenantId: 'tenant-1',
-    startDate: '2026-09-01',
-    endDate: '2027-08-31',
-    monthlyRent: 1100,
-    securityDeposit: 1100,
+    startDate: '2026-07-01',
+    endDate: '2027-06-30',
+    monthlyRent: 2800000,
+    securityDeposit: 2800000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+  },
+  {
+    id: 'lease-3',
+    propertyId: 'prop-4',
+    tenantId: 'tenant-2',
+    startDate: '2026-08-01',
+    endDate: '2027-08-01',
+    monthlyRent: 3000000,
+    securityDeposit: 3000000,
+    status: 'active',
+    tenantPhoto: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150',
+    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+  },
+  {
+    id: 'lease-4',
+    propertyId: 'prop-5',
+    tenantId: 'tenant-3',
+    startDate: '2025-01-01',
+    endDate: '2026-12-31',
+    monthlyRent: 3200000,
+    securityDeposit: 3200000,
+    status: 'active'
+  },
+  {
+    id: 'lease-5',
+    propertyId: 'prop-6',
+    tenantId: 'tenant-4',
+    startDate: '2026-03-01',
+    endDate: '2027-03-01',
+    monthlyRent: 3500000,
+    securityDeposit: 3500000,
+    status: 'active'
   }
 ];
 
 let payments: Payment[] = [
+  // lease-1 (Phòng 202) history
   {
     id: 'pay-1',
     leaseId: 'lease-1',
-    amount: 1200,
-    dueDate: '2026-08-01',
-    paymentDate: '2026-08-01',
+    amount: 3500000,
+    dueDate: '2026-06-01',
+    paymentDate: '2026-06-02',
     status: 'Paid',
-    notes: 'August Rent'
+    notes: 'Tháng 6/2026'
   },
   {
     id: 'pay-2',
     leaseId: 'lease-1',
-    amount: 1200,
-    dueDate: '2026-09-01',
-    status: 'Pending',
-    notes: 'September Rent'
+    amount: 3500000,
+    dueDate: '2026-07-01',
+    paymentDate: '2026-07-03',
+    status: 'Paid',
+    notes: 'Tháng 7/2026'
   },
   {
     id: 'pay-3',
     leaseId: 'lease-1',
-    amount: 1200,
-    dueDate: '2026-10-01',
+    amount: 3500000,
+    dueDate: '2026-08-01',
     status: 'Pending',
-    notes: 'October Rent'
+    notes: 'Tháng 8/2026'
   },
+  // lease-2 (Phòng 104) history
   {
     id: 'pay-4',
     leaseId: 'lease-2',
-    amount: 1100,
-    dueDate: '2026-09-01',
-    paymentDate: '2026-09-01',
+    amount: 2800000,
+    dueDate: '2026-07-01',
+    paymentDate: '2026-07-02',
     status: 'Paid',
-    notes: 'September Rent'
+    notes: 'Tháng 7/2026'
   },
   {
     id: 'pay-5',
     leaseId: 'lease-2',
-    amount: 1100,
-    dueDate: '2026-10-01',
+    amount: 2800000,
+    dueDate: '2026-08-01',
     status: 'Pending',
-    notes: 'October Rent'
+    notes: 'Tháng 8/2026'
   }
 ];
 

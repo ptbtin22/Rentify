@@ -25,9 +25,15 @@ interface ProfileModalProps {
   visible: boolean;
   onClose: () => void;
   onPostClick?: (post: Notice) => void;
+  user?: {
+    name: string;
+    phone: string;
+    role: string;
+    email?: string;
+  };
 }
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, onPostClick }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, onPostClick, user }) => {
   const { currentRole } = useAuth();
   const { local, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
@@ -35,18 +41,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
   const insets = useSafeAreaInsets();
   const [selectedPost, setSelectedPost] = useState<Notice | null>(null);
 
-  // Mock profile details matching the roles
-  const profileName = currentRole === 'landlord' ? local('landlord_name') : local('tenant_name');
-  const profilePhone = currentRole === 'landlord' ? '0901234567' : '0909888777';
-  const profileEmail = currentRole === 'landlord' ? 'landlord@rentify.vn' : 'jane.tenant@rentify.vn';
-  const profileSub = currentRole === 'landlord' ? local('landlord_role') : local('tenant_role');
-  const avatarUrl = currentRole === 'landlord' 
-    ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
-    : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+  // Mock profile details matching the roles or passed user
+  const profileName = user ? user.name : (currentRole === 'landlord' ? local('landlord_name') : local('tenant_name'));
+  const profilePhone = user ? user.phone : (currentRole === 'landlord' ? '0901234567' : '0909888777');
+  const profileEmail = user?.email || (currentRole === 'landlord' ? 'landlord@rentify.vn' : 'jane.tenant@rentify.vn');
+  const profileSub = user ? user.role : (currentRole === 'landlord' ? local('landlord_role') : local('tenant_role'));
+
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const loadMyNotices = () => {
     const allNotices = NoticeRepository.getNotices();
-    const sender = currentRole === 'landlord' ? 'Landlord' : 'Tenant';
+    const sender = user ? user.name : (currentRole === 'landlord' ? 'Landlord' : 'Tenant');
     setMyNotices(allNotices.filter((n: Notice) => n.senderName === sender));
   };
 
@@ -81,7 +92,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
         <View style={styles.content}>
           {/* Section 1: Profile Information Card */}
           <View style={styles.profileCard}>
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <View style={[styles.avatar, { backgroundColor: '#007AFF15', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#007AFF', fontSize: adjustSize(28), fontWeight: '800' }}>
+                {getInitials(profileName)}
+              </Text>
+            </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { fontSize: adjustSize(18) }]}>{profileName}</Text>
               <Text style={[styles.profileSub, { fontSize: adjustSize(12) }]}>{profileSub}</Text>
@@ -111,7 +126,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
                 }}
               >
                 <View style={styles.postHeader}>
-                  <Text style={[styles.postTitle, { fontSize: adjustSize(13) }]}>{item.title}</Text>
+                  <Text style={[styles.postTitle, { fontSize: adjustSize(13) }]} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.postTime}>
                     {new Date(item.createdAt).toLocaleDateString()}
                   </Text>
@@ -221,7 +236,9 @@ const styles = StyleSheet.create({
   },
   postTitle: {
     fontWeight: '800',
-    color: '#1C1C1E'
+    color: '#1C1C1E',
+    flex: 1,
+    marginRight: 8
   },
   postTime: {
     fontSize: 10,

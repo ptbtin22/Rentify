@@ -23,15 +23,17 @@ import {
   Platform,
   Animated,
   Vibration,
-  ActionSheetIOS
+  ActionSheetIOS,
+  Linking
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { Database, Property, Tenant, Lease, Payment, PaymentStatus } from '../../services/Database';
+import { Database, Property, Tenant, Lease, Payment } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
+import { formatVND } from '../../services/CurrencyUtils';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
  
@@ -53,7 +55,7 @@ if (Platform.OS === 'android') {
 }
  
 export default function LandlordPayments() {
-  const { local } = useLanguage();
+  const { local, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
   const [isConfigVisible, setIsConfigVisible] = useState(false);
   const params = useLocalSearchParams();
@@ -62,8 +64,11 @@ export default function LandlordPayments() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
-  // Filtering
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<PaymentStatus | 'All'>('All');
+  // Filtering — only All / Paid / Pending (no Overdue)
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'All' | 'Paid' | 'Pending'>('All');
+
+  // Tenant payment history modal
+  const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
 
   // Modal visibility
   const [isAddLeaseVisible, setIsAddLeaseVisible] = useState(false);
@@ -307,19 +312,24 @@ export default function LandlordPayments() {
 
   const handleSendManualReminder = (pay: Payment) => {
     const info = getPaymentDisplayData(pay);
+    // Step 1: Confirm dialog (in Vietnamese as requested)
     Alert.alert(
-      'Send Invoice Reminder',
-      `Send rent invoice reminder for ${info.propertyName} (Tenant: ${info.tenantName}) via Zalo & Push?`,
+      local('remind_confirm_title'),
+      local('remind_confirm_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Send', 
+        { text: local('cancel'), style: 'cancel' },
+        {
+          text: local('remind_confirm_btn'),
           onPress: () => {
-            Alert.alert(
-              'Reminder Sent',
-              `Manual reminder successfully sent to ${info.tenantName} for payment amount of $${info.amount.toLocaleString()}.`
-            );
-          } 
+            // Step 2: open Zalo then show success
+            Linking.openURL(`https://zalo.me/${info.tenantPhone || '0901234567'}`).catch(() => {});
+            setTimeout(() => {
+              Alert.alert(
+                local('reminder_sent_title'),
+                local('reminder_sent_msg')
+              );
+            }, 500);
+          }
         }
       ]
     );
@@ -332,11 +342,11 @@ export default function LandlordPayments() {
 
   const handleRecordPaid = (id: string) => {
     Alert.alert(
-      'Confirm Payment',
-      'Record this payment as received?',
+      local('record_paid_title'),
+      local('record_paid_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Record Paid', onPress: () => { Database.recordPaymentReceived(id); } }
+        { text: local('cancel'), style: 'cancel' },
+        { text: local('record_paid_btn'), onPress: () => { Database.recordPaymentReceived(id); } }
       ]
     );
   };
@@ -348,40 +358,65 @@ export default function LandlordPayments() {
     return {
       propertyName: prop ? prop.name : 'Unknown Property',
       tenantName: tenant ? tenant.name : 'Unknown Tenant',
+      tenantPhone: tenant ? tenant.phone : undefined,
+      tenantId: tenant ? tenant.id : undefined,
       dueDate: pay.dueDate,
       amount: pay.amount,
       status: pay.status
     };
   };
 
-  const filteredPayments = payments.filter(p => {
-    if (selectedStatusFilter === 'All') return true;
-    return p.status === selectedStatusFilter;
-  });
+  // Sorted newest-first, filtered by status
+  const filteredPayments = payments
+    .filter(p => selectedStatusFilter === 'All' || p.status === selectedStatusFilter)
+    .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
 
-  const getStatusStyles = (status: PaymentStatus) => {
+  // Build list items with month dividers injected
+  type ListItem = { type: 'payment'; data: Payment } | { type: 'divider'; label: string };
+  const listItemsWithDividers: ListItem[] = [];
+  let lastMonth = '';
+  for (const p of filteredPayments) {
+    const d = new Date(p.dueDate);
+    const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+    if (monthKey !== lastMonth) {
+      lastMonth = monthKey;
+      const label = d.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' });
+      listItemsWithDividers.push({ type: 'divider', label });
+    }
+    listItemsWithDividers.push({ type: 'payment', data: p });
+  }
+
+  const getStatusStyles = (status: string) => {
     switch (status) {
       case 'Paid':    return { bg: '#34C75926', text: '#34C759' };
       case 'Overdue': return { bg: '#FF3B3026', text: '#FF3B30' };
-      default:        return { bg: '#007AFF26', text: '#007AFF' };
+      default:        return { bg: '#FF950026', text: '#FF9500' };
     }
+  };
+
+  // All payments for a given tenant (for history modal)
+  const getTenantPaymentHistory = (tenantId: string) => {
+    const tenantLeaseIds = leases.filter(l => l.tenantId === tenantId).map(l => l.id);
+    return payments
+      .filter(p => tenantLeaseIds.includes(p.leaseId))
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>Payments & Leases</Text>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('payments_leases')}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.configActionBtn} 
+          <TouchableOpacity
+            style={styles.configActionBtn}
             onPress={() => setIsConfigVisible(true)}
             accessibilityLabel="Billing Configuration"
           >
             <Text style={[styles.configActionText, { fontSize: adjustSize(16) }]}>⚙️</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addBtnHeader} 
+          <TouchableOpacity
+            style={styles.addBtnHeader}
             onPress={() => setIsAddLeaseVisible(true)}
             accessibilityLabel="New Lease"
           >
@@ -390,76 +425,162 @@ export default function LandlordPayments() {
         </View>
       </View>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs: All | Paid | Pending only */}
       <View style={styles.filterRow}>
-        {(['All', 'Paid', 'Pending', 'Overdue'] as const).map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterTab, selectedStatusFilter === f && styles.filterTabActive]}
-            onPress={() => setSelectedStatusFilter(f)}
-          >
-            <Text style={[styles.filterTabText, selectedStatusFilter === f && styles.filterTabTextActive]}>
-              {f}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {(['All', 'Paid', 'Pending'] as const).map(f => {
+          const label = f === 'All' ? local('filter_all') : f === 'Paid' ? local('filter_paid') : local('filter_pending');
+          return (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterTab, selectedStatusFilter === f && styles.filterTabActive]}
+              onPress={() => setSelectedStatusFilter(f)}
+            >
+              <Text style={[styles.filterTabText, selectedStatusFilter === f && styles.filterTabTextActive, { fontSize: adjustSize(13) }]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Payments List */}
+      {/* Payments List with month dividers */}
       <FlatList
-        data={filteredPayments}
-        keyExtractor={item => item.id}
+        data={listItemsWithDividers}
+        keyExtractor={(item, index) => item.type === 'divider' ? `div-${index}` : item.data.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyView}>
             <Text style={styles.emptyIcon}>💳</Text>
-            <Text style={styles.emptyTitle}>No Payments</Text>
-            <Text style={styles.emptyDesc}>No payments found for status: {selectedStatusFilter}.</Text>
+            <Text style={[styles.emptyTitle, { fontSize: adjustSize(16) }]}>{local('no_payments')}</Text>
+            <Text style={[styles.emptyDesc, { fontSize: adjustSize(13) }]}>{local('no_payments_for_filter')}</Text>
           </View>
         }
         renderItem={({ item }) => {
-          const info = getPaymentDisplayData(item);
-          const colors = getStatusStyles(item.status);
+          if (item.type === 'divider') {
+            return (
+              <View style={styles.monthDivider}>
+                <View style={styles.monthDividerLine} />
+                <Text style={[styles.monthDividerLabel, { fontSize: adjustSize(11) }]}>{item.label}</Text>
+                <View style={styles.monthDividerLine} />
+              </View>
+            );
+          }
+          const pay = item.data;
+          const info = getPaymentDisplayData(pay);
+          const colors = getStatusStyles(pay.status);
+          const statusLabel = pay.status === 'Paid' ? local('filter_paid') : local('filter_pending');
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => info.tenantId ? setHistoryTenantId(info.tenantId) : null}
+              activeOpacity={0.85}
+            >
               <View style={styles.details}>
-                <Text style={styles.propertyName}>{info.propertyName}</Text>
-                <Text style={styles.tenantName}>Tenant: {info.tenantName}</Text>
-                <Text style={styles.dueDate}>Due: {info.dueDate}</Text>
+                <Text style={[styles.propertyName, { fontSize: adjustSize(15) }]}>{info.propertyName}</Text>
+                <Text style={[styles.tenantName, { fontSize: adjustSize(12) }]}>{local('tenant_label')} {info.tenantName}</Text>
+                <Text style={[styles.dueDate, { fontSize: adjustSize(12) }]}>{local('due_label')} {pay.dueDate}</Text>
               </View>
               <View style={styles.values}>
-                <Text style={styles.amount}>${info.amount.toLocaleString()}</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                  {item.status !== 'Paid' ? (
+                <Text style={[styles.amount, { fontSize: adjustSize(14) }]}>{formatVND(info.amount)}</Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {/* Status badge — tappable to mark paid if pending */}
+                  {pay.status !== 'Paid' ? (
                     <TouchableOpacity
                       style={[styles.statusBadge, { backgroundColor: colors.bg }]}
-                      onPress={() => handleRecordPaid(item.id)}
+                      onPress={() => handleRecordPaid(pay.id)}
                     >
-                      <Text style={[styles.statusText, { color: colors.text }]}>
-                        {item.status} (Tap to pay)
+                      <Text style={[styles.statusText, { color: colors.text, fontSize: adjustSize(11) }]}>
+                        {statusLabel}
                       </Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
-                      <Text style={[styles.statusText, { color: colors.text }]}>
-                        {item.status}
+                      <Text style={[styles.statusText, { color: colors.text, fontSize: adjustSize(11) }]}>
+                        {statusLabel}
                       </Text>
                     </View>
                   )}
-                  {item.status !== 'Paid' && (
+                  {/* Remind button — only for non-Paid */}
+                  {pay.status !== 'Paid' && (
                     <TouchableOpacity
                       style={styles.remindBtn}
-                      onPress={() => handleSendManualReminder(item)}
+                      onPress={() => handleSendManualReminder(pay)}
                     >
-                      <Text style={styles.remindBtnText}>🔔 Remind</Text>
+                      <Text style={[styles.remindBtnText, { fontSize: adjustSize(11) }]}>🔔 Zalo</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
+
+      {/* ─── Tenant Payment History Modal ─── */}
+      <Modal visible={!!historyTenantId} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setHistoryTenantId(null)}>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{local('payment_history')}</Text>
+              <View style={{ width: 50 }} />
+            </View>
+            <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+              {historyTenantId && (() => {
+                const tenant = tenants.find(t => t.id === historyTenantId);
+                const hist = getTenantPaymentHistory(historyTenantId);
+                let lastM = '';
+                return (
+                  <>
+                    <Text style={[styles.label, { marginBottom: 12, color: '#8E8E93' }]}>
+                      {tenant?.name}
+                    </Text>
+                    {hist.length === 0 ? (
+                      <Text style={styles.emptyDesc}>{local('no_payment_history')}</Text>
+                    ) : hist.map((p, idx) => {
+                      const d = new Date(p.dueDate);
+                      const mk = `${d.getFullYear()}-${d.getMonth()}`;
+                      const showDiv = mk !== lastM;
+                      if (showDiv) lastM = mk;
+                      const mLabel = d.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' });
+                      const lease = leases.find(l => l.id === p.leaseId);
+                      const prop = lease ? properties.find(pr => pr.id === lease.propertyId) : null;
+                      const sc = getStatusStyles(p.status);
+                      return (
+                        <React.Fragment key={`hist-frag-${p.id}`}>
+                          {showDiv && (
+                            <View key={`div-${idx}`} style={styles.monthDivider}>
+                              <View style={styles.monthDividerLine} />
+                              <Text style={styles.monthDividerLabel}>{mLabel}</Text>
+                              <View style={styles.monthDividerLine} />
+                            </View>
+                          )}
+                          <View key={p.id} style={[styles.card, { marginHorizontal: 0, marginBottom: 8 }]}>
+                            <View style={styles.details}>
+                              <Text style={styles.propertyName}>{prop?.name || 'Phòng'}</Text>
+                              <Text style={styles.dueDate}>{local('due_label')} {p.dueDate}</Text>
+                            </View>
+                            <View style={styles.values}>
+                              <Text style={styles.amount}>{formatVND(p.amount)}</Text>
+                              <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                                <Text style={[styles.statusText, { color: sc.text }]}>
+                                  {p.status === 'Paid' ? local('filter_paid') : local('filter_pending')}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </React.Fragment>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* ─── New Lease Modal ─── */}
       <Modal visible={isAddLeaseVisible} animationType="slide" transparent>
@@ -706,6 +827,25 @@ const styles = StyleSheet.create({
     color: '#FF9500',
     fontSize: 12,
     fontWeight: '700'
+  },
+  monthDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 10,
+    gap: 8
+  },
+  monthDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E5EA'
+  },
+  monthDividerLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
   },
   filterRow: {
     flexDirection: 'row',

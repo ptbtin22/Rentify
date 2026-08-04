@@ -181,8 +181,8 @@ export const translations: Record<string, Record<Language, string>> = {
   landlord_role: { en: "Landlord (Manager)", vi: "Chủ nhà (Quản lý)" },
   tenant_role: { en: "Linked Resident", vi: "Cư dân liên kết" },
   post_details: { en: "Post Details", vi: "Chi Tiết Tin Đăng" },
-  landlord_name: { en: "Nguyen Van Landlord", vi: "Nguyễn Văn Chủ Nhà" },
-  tenant_name: { en: "Jane Tenant", vi: "Nguyễn Thị Cư Dân" },
+  landlord_name: { en: "Landlord", vi: "Chủ nhà" },
+  tenant_name: { en: "Jane Tenant", vi: "Jane Tenant" },
   like: { en: "Like", vi: "Thích" },
   comment: { en: "Comment", vi: "Bình luận" },
   comments: { en: "Comments", vi: "Bình luận" },
@@ -222,6 +222,7 @@ export const translations: Record<string, Record<Language, string>> = {
   pending: { en: "Pending", vi: "Chờ duyệt" },
   overdue: { en: "Overdue", vi: "Quá hạn" },
   recent_payments: { en: "Recent Payments", vi: "Thanh toán gần đây" },
+  view_all: { en: "View All", vi: "Xem tất cả" },
   no_recent_payments: { en: "No recent payments logged.", vi: "Chưa có giao dịch gần đây." },
   view_profile: { en: "View Profile", vi: "Xem hồ sơ" },
   revenue_reports: { en: "Revenue & Reports", vi: "Doanh thu & Báo cáo" },
@@ -231,6 +232,8 @@ export const translations: Record<string, Record<Language, string>> = {
   total_projected: { en: "Total Projected Income:", vi: "Tổng doanh thu dự kiến:" },
   monthly_projections: { en: "Monthly Projections", vi: "Dự kiến doanh thu" },
   average_rent_breakdown: { en: "Average Rent Breakdown", vi: "Cơ cấu giá phòng trung bình" },
+  avg_rent_breakdown: { en: "Unpaid Balance", vi: "Chưa thu" },
+  projected_revenue: { en: "Total Projected", vi: "Tổng doanh thu dự kiến" },
   tenants: { en: "Tenants", vi: "Người Thuê" },
   add_tenant: { en: "Add Tenant", vi: "Thêm người thuê" },
   contact_info: { en: "Contact Information", vi: "Thông tin liên hệ" },
@@ -244,7 +247,73 @@ export const translations: Record<string, Record<Language, string>> = {
   no_tenants: { en: "No Tenants", vi: "Chưa có người thuê" },
   add_first_tenant: { en: "Add your first tenant to get started.", vi: "Thêm người thuê đầu tiên để bắt đầu." },
   leasing: { en: "Leasing", vi: "Đang thuê" },
-  inactive: { en: "Inactive", vi: "Chưa thuê" }
+  inactive: { en: "Inactive", vi: "Chưa thuê" },
+  logout: { en: "Logout", vi: "Đăng xuất" },
+
+  // Payments tab
+  payments_leases: { en: "Payments & Leases", vi: "Thanh toán & Hợp đồng" },
+  no_payments: { en: "No Payments", vi: "Chưa có thanh toán" },
+  no_payments_for_filter: { en: "No payments found for this filter.", vi: "Không tìm thấy thanh toán nào." },
+  filter_all: { en: "All", vi: "Tất cả" },
+  filter_paid: { en: "Paid", vi: "Đã thu" },
+  filter_pending: { en: "Pending", vi: "Chờ thu" },
+  remind_confirm_title: { en: "Send Rent Reminder via Zalo?", vi: "Nhắc tiền phòng qua Zalo?" },
+  remind_confirm_msg: { en: "Are you sure you want to remind this tenant about their room payment via Zalo?", vi: "Bạn chắc chắn muốn nhắc lại người này tiền phòng qua Zalo?" },
+  remind_confirm_btn: { en: "Send Reminder", vi: "Gửi nhắc" },
+  reminder_sent_title: { en: "Reminder Sent", vi: "Đã gửi nhắc" },
+  reminder_sent_msg: { en: "Reminder successfully sent via Zalo.", vi: "Đã gửi nhắc qua Zalo thành công." },
+  due_label: { en: "Due:", vi: "Hạn:" },
+  tenant_label: { en: "Tenant:", vi: "Người thuê:" },
+  payment_history: { en: "Payment History", vi: "Lịch sử thanh toán" },
+  no_payment_history: { en: "No payment history.", vi: "Chưa có lịch sử thanh toán." },
+  record_paid_title: { en: "Confirm Payment", vi: "Xác nhận thanh toán" },
+  record_paid_msg: { en: "Record this payment as received?", vi: "Ghi nhận đã thu tiền phòng tháng này?" },
+  record_paid_btn: { en: "Record Paid", vi: "Đã thu" },
+
+  // Properties tab
+  expiring_soon: { en: "Expiring Soon", vi: "Sắp hết hạn" },
+  occupied: { en: "Occupied", vi: "Đang thuê" },
+  vacant: { en: "Vacant", vi: "Phòng trống" },
+  room_payment_history: { en: "Room Payment History", vi: "Lịch sử thanh toán phòng" },
+  no_leases_for_room: { en: "No lease history for this room.", vi: "Phòng này chưa có hợp đồng nào." },
+  lease_history: { en: "Lease History", vi: "Lịch sử hợp đồng" },
+  monthly_rent_label: { en: "Monthly Rent", vi: "Tiền phòng tháng" },
+  security_deposit_label: { en: "Security Deposit", vi: "Tiền cọc" },
+  lease_duration_label: { en: "Lease Duration", vi: "Thời hạn hợp đồng" },
+  days_remaining: { en: "days remaining", vi: "ngày còn lại" },
+  new_lease_title: { en: "New Lease", vi: "Tạo hợp đồng mới" },
+
+  // Community tab
+  community_tab: { en: "Community", vi: "Cộng đồng" },
+  community_title: { en: "Your Community", vi: "Khu trọ của bạn" },
+  community_desc: { en: "Neighbors in your building complex", vi: "Những người cùng khu trọ với bạn" },
+  community_empty: { en: "No other tenants found.", vi: "Không tìm thấy người thuê nào khác." },
+  room_label: { en: "Room", vi: "Phòng" },
+  home: { en: "Home", vi: "Trang chủ" },
+  bulletin: { en: "Bulletin", vi: "Thông báo" },
+
+  // Portal / Tenant home
+  quick_links: { en: "Quick Links", vi: "Liên kết nhanh" },
+  your_payments: { en: "Your Rent Payments", vi: "Lịch sử thanh toán tiền phòng" },
+  no_payment_history_tenant: { en: "No payment history logged.", vi: "Chưa có lịch sử thanh toán." },
+  active_lease_title: { en: "Active Lease Agreement", vi: "Hợp đồng thuê phòng" },
+  rental_address: { en: "Rental Address", vi: "Địa chỉ phòng" },
+  lease_duration: { en: "Lease Duration", vi: "Thời hạn hợp đồng" },
+  security_deposit: { en: "Security Deposit", vi: "Tiền cọc" },
+  monthly_rent: { en: "Monthly Rent", vi: "Tiền phòng/tháng" },
+  active_badge: { en: "ACTIVE", vi: "HIỆU LỰC" },
+
+  // Contract / View contract
+  rental_agreement: { en: "Rental Agreement", vi: "Hợp đồng thuê nhà" },
+  contract_photo_label: { en: "Contract Document", vi: "Ảnh hợp đồng" },
+  no_contract_photo: { en: "No contract photo attached.", vi: "Chưa có ảnh hợp đồng đính kèm." },
+
+  // Bank payment flow
+  open_bank_app: { en: "Open Bank App", vi: "Mở ứng dụng ngân hàng" },
+  bank_redirect_msg: { en: "Opening bank app... Return here after transfer to confirm.", vi: "Đang mở ứng dụng ngân hàng... Quay lại đây sau khi chuyển khoản để xác nhận." },
+  payment_confirmed: { en: "Payment Confirmed!", vi: "Xác nhận thanh toán thành công!" },
+  payment_confirmed_desc: { en: "Your payment has been recorded. Your home page has been updated.", vi: "Đã ghi nhận thanh toán. Trang chủ của bạn đã được cập nhật." },
+  base_rent: { en: "Base Rent", vi: "Tiền phòng" }
 };
 
 // Check device language automatically (Q1 requirement)

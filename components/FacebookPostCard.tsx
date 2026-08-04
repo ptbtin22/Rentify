@@ -49,9 +49,14 @@ export const FacebookPostCard: React.FC<FacebookPostCardProps> = ({
 
   // Determine avatar icon and category badge styling
   const isLandlord = item.senderName === 'Landlord';
-  const avatarUrl = isLandlord
-    ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
-    : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+  const displayName = isLandlord ? local('landlord') : item.senderName;
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const categoryLabel = 
     item.type === 'fire' 
@@ -72,12 +77,16 @@ export const FacebookPostCard: React.FC<FacebookPostCardProps> = ({
       {/* 1. Header row */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => onPosterClick(item.senderName)}>
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          <View style={[styles.avatar, { backgroundColor: '#007AFF15', alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: '#007AFF', fontSize: adjustSize(16), fontWeight: '800' }}>
+              {getInitials(displayName)}
+            </Text>
+          </View>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <TouchableOpacity onPress={() => onPosterClick(item.senderName)}>
             <Text style={[styles.posterName, { fontSize: adjustSize(14) }]}>
-              {isLandlord ? local('landlord') : item.senderName}
+              {displayName}
             </Text>
           </TouchableOpacity>
           <View style={styles.metaRow}>

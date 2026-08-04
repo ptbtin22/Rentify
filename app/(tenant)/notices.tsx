@@ -232,7 +232,7 @@ export default function TenantNotices() {
 
       {/* Header View */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { fontSize: adjustSize(18) }]}>{local('bulletin_board')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('bulletin_board')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.actionButton} 

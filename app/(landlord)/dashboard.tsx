@@ -23,6 +23,7 @@ import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { Database } from '../../services/Database';
 import { useEasyViewMode } from '../../services/EasyViewManager';
+import { formatVND, formatVNDShort } from '../../services/CurrencyUtils';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
@@ -146,7 +147,16 @@ export default function LandlordDashboard() {
           style={styles.profileHeaderBtn} 
           onPress={() => setIsDropdownVisible(!isDropdownVisible)}
         >
-          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>NL</Text>
+          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>
+            {(() => {
+              const name = local('landlord_name') || 'Landlord';
+              const parts = name.split(' ');
+              if (parts.length >= 2) {
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+              }
+              return name.substring(0, 2).toUpperCase();
+            })()}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -192,14 +202,14 @@ export default function LandlordDashboard() {
           {/* Card 1 */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>💰</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.totalRevenue.toLocaleString()}</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{formatVNDShort(metrics.totalRevenue)}</Text>
             <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('monthly_revenue')}</Text>
           </View>
 
           {/* Card 2 */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>⚠️</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>${metrics.unpaidBalance.toLocaleString()}</Text>
+            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{formatVNDShort(metrics.unpaidBalance)}</Text>
             <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('unpaid_balance')}</Text>
           </View>
 
@@ -297,7 +307,7 @@ export default function LandlordDashboard() {
                     <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('payment_amount').replace(':', '')}: {item.dueDate}</Text>
                   </View>
                   <View style={styles.rowValues}>
-                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>${item.amount.toLocaleString()}</Text>
+                    <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>{formatVND(item.amount)}</Text>
                     <Text style={[styles.rowStatus, { color: getStatusColor(item.status), fontSize: adjustSize(11) }]}>
                       {local(item.status.toLowerCase()) || item.status}
                     </Text>
@@ -329,19 +339,19 @@ export default function LandlordDashboard() {
                 <View style={styles.reportRow}>
                   <Text style={styles.reportLabel}>{local('collected_income')}</Text>
                   <Text style={[styles.reportValue, { color: '#34C759' }]}>
-                    ${metrics.totalRevenue.toLocaleString()}
+                    {formatVNDShort(metrics.totalRevenue)}
                   </Text>
                 </View>
-                <View style={styles.reportRow}>
-                  <Text style={styles.reportLabel}>{local('outstanding_invoices')}</Text>
-                  <Text style={[styles.reportValue, { color: '#FF9500' }]}>
-                    ${metrics.unpaidBalance.toLocaleString()}
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>{local('avg_rent_breakdown') || 'Unpaid Balance'}</Text>
+                  <Text style={styles.breakdownValue}>
+                    {formatVNDShort(metrics.unpaidBalance)}
                   </Text>
                 </View>
-                <View style={styles.reportRow}>
-                  <Text style={styles.reportLabel}>{local('total_projected')}</Text>
-                  <Text style={[styles.reportValue, { fontWeight: '800' }]}>
-                    ${(metrics.totalRevenue + metrics.unpaidBalance).toLocaleString()}
+                <View style={[styles.breakdownRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>{local('projected_revenue') || 'Total'}</Text>
+                  <Text style={styles.totalValue}>
+                    {formatVNDShort(metrics.totalRevenue + metrics.unpaidBalance)}
                   </Text>
                 </View>
               </View>

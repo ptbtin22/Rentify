@@ -5,7 +5,7 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -23,6 +23,7 @@ import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../s
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
+import { formatVND } from '../../services/CurrencyUtils';
 
 export default function LandlordProperties() {
   const router = useRouter();
@@ -35,6 +36,8 @@ export default function LandlordProperties() {
   const [isAddVisible, setIsAddVisible] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isKhuModalVisible, setIsKhuModalVisible] = useState(false);
+  // Room payment history modal
+  const [historyProperty, setHistoryProperty] = useState<Property | null>(null);
 
   // Form Fields for Room
   const [name, setName] = useState('');
@@ -217,6 +220,25 @@ export default function LandlordProperties() {
       });
   };
 
+  // Days until lease expiry for a property (returns null if no active lease)
+  const getDaysToExpiry = (propId: string): number | null => {
+    const activeLease = leases.find(l => l.propertyId === propId && l.status === 'active');
+    if (!activeLease) return null;
+    const end = new Date(activeLease.endDate);
+    const now = new Date();
+    end.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+    return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // All payments for a property (across all leases)
+  const getRoomPaymentHistory = (propId: string) => {
+    const propLeaseIds = leases.filter(l => l.propertyId === propId).map(l => l.id);
+    return Database.getPayments()
+      .filter(p => propLeaseIds.includes(p.leaseId))
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+  };
+
   const filteredProperties = properties.filter(
     p => selectedKhuFilterId === 'all' || p.khuTroId === selectedKhuFilterId
   );
@@ -282,45 +304,164 @@ export default function LandlordProperties() {
             <Text style={styles.emptyDesc}>Add your first rental property to get started.</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => setSelectedProperty(item)}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.iconText}>
-                {item.propertyType === 'House' ? '🏡' : '🏢'}
-              </Text>
-            </View>
+        renderItem={({ item }) => {
+          const daysToExpiry = getDaysToExpiry(item.id);
+          const isExpiringSoon = daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry < 30;
+          const isOccupied = item.isOccupied;
 
-            <View style={styles.details}>
-              <Text style={styles.name}>
-                {item.name} • <Text style={{ fontSize: 13, color: '#8E8E93' }}>{khuTros.find(k => k.id === item.khuTroId)?.name || 'Khu trọ'}</Text>
-              </Text>
-              <Text style={styles.address}>{item.address}</Text>
-            </View>
+          let badgeColor = isExpiringSoon ? '#FF3B30' : (isOccupied ? '#34C759' : '#FF9500');
+          let badgeBg = isExpiringSoon ? '#FF3B3026' : (isOccupied ? '#34C75926' : '#FF950026');
+          let badgeLabel = isExpiringSoon
+            ? local('expiring_soon')
+            : isOccupied ? local('occupied') : local('vacant');
 
-            <View style={styles.values}>
-              <Text style={styles.rent}>${item.rentAmount.toLocaleString()}</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: item.isOccupied ? '#34C75926' : '#FF950026' }
-                ]}
-              >
-                <Text style={[styles.statusText, { color: item.isOccupied ? '#34C759' : '#FF9500' }]}>
-                  {item.isOccupied ? 'Occupied' : 'Vacant'}
+          return (
+            <TouchableOpacity style={styles.card} onPress={() => setHistoryProperty(item)}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.iconText}>
+                  {item.propertyType === 'House' ? '🏡' : '🏢'}
                 </Text>
               </View>
-            </View>
-          </TouchableOpacity>
-        )}
+
+              <View style={styles.details}>
+                <Text style={styles.name}>
+                  {item.name} • <Text style={{ fontSize: 13, color: '#8E8E93' }}>{khuTros.find(k => k.id === item.khuTroId)?.name || 'Khu trọ'}</Text>
+                </Text>
+                <Text style={styles.address}>{item.address}</Text>
+              </View>
+
+              <View style={styles.values}>
+                <Text style={styles.rent}>{formatVND(item.rentAmount)}</Text>
+                {isExpiringSoon && daysToExpiry !== null && (
+                  <Text style={{ fontSize: 10, color: '#FF3B30', marginBottom: 2 }}>
+                    {daysToExpiry} {local('days_remaining')}
+                  </Text>
+                )}
+                <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                  <Text style={[styles.statusText, { color: badgeColor }]}>
+                    {badgeLabel}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
 
+      {/* ─── Room Payment History Modal ─── */}
+      <Modal
+        visible={!!historyProperty}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setHistoryProperty(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setHistoryProperty(null)}>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { fontSize: adjustSize(17) }]}>
+                {historyProperty?.name}
+              </Text>
+              {/* Edit property button */}
+              <TouchableOpacity onPress={() => {
+                setSelectedProperty(historyProperty);
+                setHistoryProperty(null);
+              }}>
+                <Text style={styles.modalSave}>✏️</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+              {/* Quick stats */}
+              {historyProperty && (() => {
+                const daysToExpiry = getDaysToExpiry(historyProperty.id);
+                const isExpiring = daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry < 30;
+                return (
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={[styles.label, { fontSize: adjustSize(13), marginBottom: 0 }]}>
+                        {local('monthly_rent_label')}
+                      </Text>
+                      <Text style={[styles.label, { fontSize: adjustSize(13), marginBottom: 0, color: '#007AFF' }]}>
+                        {formatVND(historyProperty.rentAmount)}
+                      </Text>
+                    </View>
+                    {isExpiring && daysToExpiry !== null && (
+                      <View style={{ backgroundColor: '#FF3B3015', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                        <Text style={{ color: '#FF3B30', fontSize: adjustSize(13), fontWeight: '600' }}>
+                          ⚠️ {local('expiring_soon')} — {daysToExpiry} {local('days_remaining')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('room_payment_history')}</Text>
+              {historyProperty && (() => {
+                const hist = getRoomPaymentHistory(historyProperty.id);
+                if (hist.length === 0) {
+                  return (
+                    <View style={styles.emptyLease}>
+                      <Text style={styles.emptyLeaseText}>{local('no_leases_for_room')}</Text>
+                    </View>
+                  );
+                }
+                let lastM = '';
+                return hist.map((p, idx) => {
+                  const d = new Date(p.dueDate);
+                  const mk = `${d.getFullYear()}-${d.getMonth()}`;
+                  const showDiv = mk !== lastM;
+                  if (showDiv) lastM = mk;
+                  const mLabel = d.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' });
+                  const lease = leases.find(l => l.id === p.leaseId);
+                  const tenant = lease ? tenants.find(t => t.id === lease.tenantId) : null;
+                  const isPaid = p.status === 'Paid';
+                  return (
+                    <React.Fragment key={`hist-frag-${p.id}`}>
+                      {showDiv && (
+                        <View key={`div-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 8 }}>
+                          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E5EA' }} />
+                          <Text style={{ fontSize: 11, color: '#8E8E93', fontWeight: '700', textTransform: 'uppercase' }}>{mLabel}</Text>
+                          <View style={{ flex: 1, height: 1, backgroundColor: '#E5E5EA' }} />
+                        </View>
+                      )}
+                      <View style={[styles.khuListItem, { marginBottom: 8 }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.khuListName, { fontSize: adjustSize(14) }]}>{p.notes || 'Tiền phòng'}</Text>
+                          <Text style={[styles.khuListAddr, { fontSize: adjustSize(12) }]}>
+                            {tenant?.name || 'Không rõ'} • Hạn: {p.dueDate}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: adjustSize(14), fontWeight: '700', color: '#1C1C1E' }}>
+                            {formatVND(p.amount)}
+                          </Text>
+                          <View style={{ backgroundColor: isPaid ? '#34C75926' : '#FF950026', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
+                            <Text style={{ fontSize: 11, color: isPaid ? '#34C759' : '#FF9500', fontWeight: '700' }}>
+                              {isPaid ? local('filter_paid') : local('filter_pending')}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* ─── local('manage_complexes_title') ─── */}
-      <Modal 
-        visible={isKhuModalVisible} 
-        animationType="slide" 
+      <Modal
+        visible={isKhuModalVisible}
+        animationType="slide"
         transparent
         onRequestClose={() => setIsKhuModalVisible(false)}
       >
+
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             

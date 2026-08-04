@@ -68,6 +68,44 @@ let mockNotices: Notice[] = [
     comments: [],
     approved: false, // Pending approval by Landlord
     khuTroId: 'khu-1'
+  },
+  {
+    id: '4',
+    type: 'info',
+    title: 'Tìm chủ xe máy biển số 59X-XXXX',
+    body: 'Có ai biết chủ chiếc Vision đỏ đậu chắn lối ra vào không ạ? Vui lòng dời xe giúp mình.',
+    senderName: 'John Doe',
+    createdAt: new Date(Date.now() - 24 * 3600000),
+    likes: 3,
+    comments: [],
+    approved: true,
+    khuTroId: 'khu-1'
+  },
+  {
+    id: '5',
+    type: 'info',
+    title: 'Pass lại nồi cơm điện',
+    body: 'Mình dư dùng một nồi cơm điện Toshiba 1.8L còn rất mới, pass lại giá 300k. Ai cần liên hệ mình nhé.',
+    senderName: 'Alice Smith',
+    createdAt: new Date(Date.now() - 48 * 3600000),
+    likes: 8,
+    comments: [
+      { id: 'c-2', senderName: 'Bob Johnson', body: 'Cho mình xin hình thật với ạ.', createdAt: new Date(Date.now() - 47 * 3600000) }
+    ],
+    approved: true,
+    khuTroId: 'khu-1'
+  },
+  {
+    id: '6',
+    type: 'info',
+    title: 'Gợi ý dọn dẹp hành lang',
+    body: 'Mình thấy dạo này hành lang chung hơi bụi, mọi người có ý định góp tiền thuê người dọn thêm một buổi cuối tuần không?',
+    senderName: 'Bob Johnson',
+    createdAt: new Date(Date.now() - 72 * 3600000),
+    likes: 12,
+    comments: [],
+    approved: true,
+    khuTroId: 'khu-1'
   }
 ];
 

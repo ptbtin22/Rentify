@@ -20,20 +20,22 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Database, Tenant, Lease } from '../../services/Database';
+import { Database, Tenant, Lease, Payment } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
 import { PhoneInput } from '../../components/PhoneInput';
 import { validatePhone } from '../../services/PhoneUtils';
+import { formatVND } from '../../services/CurrencyUtils';
  
 export default function LandlordTenants() {
-  const { local } = useLanguage();
+  const { local, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
   const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   // Modals
   const [isAddVisible, setIsAddVisible] = useState(false);
@@ -54,6 +56,7 @@ export default function LandlordTenants() {
     setTenants([...Database.getTenants()]);
     setLeases([...Database.getLeases()]);
     setProperties([...Database.getProperties()]);
+    setPayments([...Database.getPayments()]);
   };
 
   useEffect(() => {
@@ -119,6 +122,13 @@ export default function LandlordTenants() {
           propertyName: prop ? prop.name : 'Unknown Property'
         };
       });
+  };
+
+  const getTenantPaymentHistory = (tenantId: string) => {
+    const tenantLeaseIds = leases.filter(l => l.tenantId === tenantId).map(l => l.id);
+    return payments
+      .filter(p => tenantLeaseIds.includes(p.leaseId))
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   };
 
   return (
@@ -322,15 +332,66 @@ export default function LandlordTenants() {
                       });
                     }}
                   >
-                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>🔑 Assign to Room / Create Lease</Text>
+                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>🔑 {local('new_lease_title')}</Text>
                   </TouchableOpacity>
                 )}
+
+                {/* Payment History Section */}
+                <Text style={[styles.label, { fontSize: adjustSize(12), marginTop: 8 }]}>{local('payment_history')}</Text>
+                {(() => {
+                  const hist = getTenantPaymentHistory(selectedTenant.id);
+                  if (hist.length === 0) {
+                    return (
+                      <View style={styles.emptyLease}>
+                        <Text style={[styles.emptyLeaseText, { fontSize: adjustSize(13) }]}>{local('no_payment_history')}</Text>
+                      </View>
+                    );
+                  }
+                  let lastM = '';
+                  return (
+                    <View style={styles.leaseContainer}>
+                      {hist.map((p, idx) => {
+                        const d = new Date(p.dueDate);
+                        const mk = `${d.getFullYear()}-${d.getMonth()}`;
+                        const showDiv = mk !== lastM;
+                        if (showDiv) lastM = mk;
+                        const mLabel = d.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' });
+                        const lease = leases.find(l => l.id === p.leaseId);
+                        const prop = lease ? properties.find(pr => pr.id === lease.propertyId) : null;
+                        const isPaid = p.status === 'Paid';
+                        return (
+                          <React.Fragment key={`hist-frag-${p.id}`}>
+                            {showDiv && (
+                              <View key={`div-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6, gap: 6 }}>
+                                <View style={{ flex: 1, height: 1, backgroundColor: '#E5E5EA' }} />
+                                <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: '700', textTransform: 'uppercase' }}>{mLabel}</Text>
+                                <View style={{ flex: 1, height: 1, backgroundColor: '#E5E5EA' }} />
+                              </View>
+                            )}
+                            <View key={p.id} style={[styles.leaseRow, { justifyContent: 'space-between' }]}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.leasePropName, { fontSize: adjustSize(13) }]}>{prop?.name || 'Phòng'}</Text>
+                                <Text style={[styles.leaseDates, { fontSize: adjustSize(11) }]}>{local('due_label')} {p.dueDate}</Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ fontSize: adjustSize(13), fontWeight: '700' }}>{formatVND(p.amount)}</Text>
+                                <Text style={{ fontSize: 11, color: isPaid ? '#34C759' : '#FF9500', fontWeight: '600' }}>
+                                  {isPaid ? local('filter_paid') : local('filter_pending')}
+                                </Text>
+                              </View>
+                            </View>
+                          </React.Fragment>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
 
                 <TouchableOpacity
                   style={styles.deleteBtn}
                   onPress={() => handleDelete(selectedTenant.id)}
                 >
-                  <Text style={styles.deleteBtnText}>Delete Tenant</Text>
+                  <Text style={styles.deleteBtnText}>{local('delete')} {local('tenant') || 'Tenant'}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
