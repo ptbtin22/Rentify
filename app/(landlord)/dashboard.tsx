@@ -28,12 +28,13 @@ import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
 import { PostDetailModal } from '../../components/PostDetailModal';
-import { Notice } from '../../services/NoticeRepository';
+import { FireConfirmationModal } from '../../components/FireConfirmationModal';
+import { Notice, NoticeRepository } from '../../services/NoticeRepository';
 
 export default function LandlordDashboard() {
   const router = useRouter();
   const { logout } = useAuth();
-  const { local } = useLanguage();
+  const { local, localF } = useLanguage();
   const insets = useSafeAreaInsets();
 
   // Metrics state
@@ -50,6 +51,7 @@ export default function LandlordDashboard() {
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
   const { adjustSize } = useEasyViewMode();
 
   // Calculate Metrics from Database
@@ -117,21 +119,21 @@ export default function LandlordDashboard() {
     const unpaidCount = payments.filter(p => p.status !== 'Paid').length;
     if (unpaidCount === 0) {
       Alert.alert(
-        local('announcements') || 'Reminders',
-        'All invoices are fully paid. No reminders needed!'
+        local('reminders_title'),
+        local('all_invoices_paid')
       );
       return;
     }
 
     // Trigger local push notification to simulate the reminders going out
     await NotificationManager.triggerLocalNotification(
-      '⚡ Rent Reminder Dispatched',
-      `Sent rent reminders to ${unpaidCount} rooms with outstanding balances.`
+      local('rent_reminder_push_title'),
+      localF('rent_reminder_push_body', { count: unpaidCount })
     );
 
     Alert.alert(
-      'Reminders Dispatched',
-      `Rent invoice reminders successfully sent to ${unpaidCount} unpaid rooms via Push & Zalo.`
+      local('reminders_dispatched_title'),
+      localF('reminders_dispatched_desc', { count: unpaidCount })
     );
   };
 
@@ -143,21 +145,30 @@ export default function LandlordDashboard() {
           <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>{local('welcome_back')}</Text>
           <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('dashboard')}</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.profileHeaderBtn} 
-          onPress={() => setIsDropdownVisible(!isDropdownVisible)}
-        >
-          <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>
-            {(() => {
-              const name = local('landlord_name') || 'Landlord';
-              const parts = name.split(' ');
-              if (parts.length >= 2) {
-                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-              }
-              return name.substring(0, 2).toUpperCase();
-            })()}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.fireHeaderBtn}
+            onPress={() => setIsFireConfirmVisible(true)}
+            accessibilityLabel={local('emergency_fire_alert')}
+          >
+            <Text style={{ fontSize: adjustSize(18) }}>🚨</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.profileHeaderBtn}
+            onPress={() => setIsDropdownVisible(!isDropdownVisible)}
+          >
+            <Text style={[styles.profileHeaderInitials, { fontSize: adjustSize(14) }]}>
+              {(() => {
+                const name = local('landlord_name') || 'Landlord';
+                const parts = name.split(' ');
+                if (parts.length >= 2) {
+                  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                }
+                return name.substring(0, 2).toUpperCase();
+              })()}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ─── Profile Dropdown Menu Overlay ─── */}
@@ -235,7 +246,7 @@ export default function LandlordDashboard() {
             {/* Create Lease action */}
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => router.push({ pathname: '/(landlord)/payments', params: { openNewLease: 'true' } })}
+              onPress={() => router.push('/(landlord)/create-lease')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#007AFF15' }]}>
                 <Text style={styles.actionIcon}>📝</Text>
@@ -382,11 +393,12 @@ export default function LandlordDashboard() {
                 </View>
               </View>
 
-              <Text style={styles.modalSectionLabel}>Performance Insights</Text>
+              <Text style={styles.modalSectionLabel}>{local('performance_insights')}</Text>
               <View style={styles.insightBox}>
                 <Text style={styles.insightText}>
-                  💡 Your occupancy rate is currently sitting at <Text style={styles.boldText}>{metrics.occupancyRate.toFixed(0)}%</Text>. 
-                  Filling vacant rooms could boost monthly revenue by up to <Text style={styles.boldText}>$2,500</Text>.
+                  {localF('insight_occupancy_text', { rate: metrics.occupancyRate.toFixed(0) })}
+                  {' '}
+                  {localF('insight_revenue_text', { amount: formatVNDShort(5000000) })}
                 </Text>
               </View>
             </ScrollView>
@@ -408,6 +420,27 @@ export default function LandlordDashboard() {
       <SettingsModal
         visible={isSettingsVisible}
         onClose={() => setIsSettingsVisible(false)}
+      />
+
+      <FireConfirmationModal
+        visible={isFireConfirmVisible}
+        onClose={() => setIsFireConfirmVisible(false)}
+        onConfirm={async () => {
+          await NoticeRepository.addNotice(
+            'fire',
+            local('emergency_fire_alert'),
+            local('fire_alert_message'),
+            local('landlord_name'),
+            new Date(),
+            undefined,
+            true
+          );
+
+          await NotificationManager.triggerLocalNotification(
+            '🔥 ' + local('emergency_fire_alert'),
+            local('fire_alert_message')
+          );
+        }}
       />
 
       <PostDetailModal
@@ -701,6 +734,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1C1C1E'
   },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  breakdownLabel: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontWeight: '500'
+  },
+  breakdownValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FF9500'
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    paddingTop: 12
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E'
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
   chartMockContainer: {
     backgroundColor: '#F2F2F7',
     borderRadius: 16,
@@ -758,6 +821,11 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: '800'
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
   profileHeaderBtn: {
     width: 36,
     height: 36,
@@ -767,6 +835,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#007AFF'
+  },
+  fireHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FF3B301A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FF3B3033'
   },
   profileHeaderInitials: {
     fontWeight: '900',

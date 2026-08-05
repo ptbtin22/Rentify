@@ -70,14 +70,14 @@ export default function LandlordNotices() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          options: [local('cancel'), local('take_photo_action'), local('choose_from_library_action')],
           cancelButtonIndex: 0
         },
         async (buttonIndex) => {
           if (buttonIndex === 1) {
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+              Alert.alert(local('permission_required'), local('permission_camera_photos'));
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
@@ -92,7 +92,7 @@ export default function LandlordNotices() {
           } else if (buttonIndex === 2) {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Required', 'Photo library access is needed to attach images.');
+              Alert.alert(local('permission_required'), local('permission_library_attach'));
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -111,7 +111,7 @@ export default function LandlordNotices() {
       // Android: go straight to library picker
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Photo library access is needed to attach images.');
+        Alert.alert(local('permission_required'), local('permission_library_attach'));
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -323,7 +323,7 @@ export default function LandlordNotices() {
           {/* Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setIsPosterProfileVisible(false)}>
-              <Text style={styles.modalCancel}>Close</Text>
+              <Text style={styles.modalCancel}>{local('close')}</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{local('profile')}</Text>
             <View style={{ width: 50 }} />

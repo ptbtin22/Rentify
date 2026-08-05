@@ -12,9 +12,13 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
+  Linking,
+  Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Database, Tenant } from '../../services/Database';
+import { getInitials } from '../../services/nameUtils';
 import { AuthManager } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
@@ -25,6 +29,8 @@ interface CommunityMember {
   name: string;
   phone: string;
   roomName: string;
+  photoUri?: string;
+  zalo?: string;
 }
 
 // Mask phone: 0901******5
@@ -79,7 +85,9 @@ export default function TenantCommunity() {
               tenantId: tenant.id,
               name: tenant.name,
               phone: tenant.phone,
-              roomName: prop.name
+              roomName: prop.name,
+              photoUri: tenant.photoUri,
+              zalo: tenant.zalo
             });
           }
         }
@@ -93,14 +101,6 @@ export default function TenantCommunity() {
     loadMembers();
     return unsub;
   }, []);
-
-  const getInitials = (name: string) => {
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -135,11 +135,15 @@ export default function TenantCommunity() {
             onPress={() => setSelectedMember(item)}
           >
             {/* Avatar */}
-            <View style={styles.avatar}>
-              <Text style={[styles.avatarText, { fontSize: adjustSize(16) }]}>
-                {getInitials(item.name)}
-              </Text>
-            </View>
+            {item.photoUri ? (
+              <Image source={{ uri: item.photoUri }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={[styles.avatarText, { fontSize: adjustSize(16) }]}>
+                  {getInitials(item.name)}
+                </Text>
+              </View>
+            )}
             {/* Info */}
             <View style={styles.info}>
               <Text style={[styles.name, { fontSize: adjustSize(15) }]}>{item.name}</Text>
@@ -150,20 +154,35 @@ export default function TenantCommunity() {
                 📞 {maskPhone(item.phone)}
               </Text>
             </View>
-            {/* Call button */}
-            <TouchableOpacity
-              style={styles.callBtn}
-              onPress={() => {
-                Linking.openURL(`tel:${item.phone}`).catch(() => {
-                  Alert.alert(
-                    'Call Failed',
-                    'Phone calls are not supported on this simulator/device.'
-                  );
-                });
-              }}
-            >
-              <Text style={[styles.callBtnText, { fontSize: adjustSize(12) }]}>📞</Text>
-            </TouchableOpacity>
+            {/* Contact actions */}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.zaloBtn}
+                accessibilityLabel={local('zalo_chat')}
+                onPress={() => {
+                  const target = (item.zalo || item.phone).replace(/\D/g, '');
+                  Linking.openURL(`https://zalo.me/${target}`).catch(() => {
+                    Alert.alert(local('zalo_chat'), local('call_failed_desc'));
+                  });
+                }}
+              >
+                <Text style={[styles.actionIcon, { fontSize: adjustSize(12) }]}>💬</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.callBtn}
+                accessibilityLabel={local('call_action')}
+                onPress={() => {
+                  Linking.openURL(`tel:${item.phone}`).catch(() => {
+                    Alert.alert(
+                      local('call_failed_title'),
+                      local('call_failed_desc')
+                    );
+                  });
+                }}
+              >
+                <Text style={[styles.actionIcon, { fontSize: adjustSize(12) }]}>📞</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         )}
       />
@@ -175,6 +194,7 @@ export default function TenantCommunity() {
         user={selectedMember ? {
           name: selectedMember.name,
           phone: selectedMember.phone,
+          zalo: selectedMember.zalo || selectedMember.phone,
           role: local('tenant_role') || 'Tenant'
         } : undefined}
       />
@@ -236,7 +256,9 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#34C75930',
+    backgroundColor: '#34C75930'
+  },
+  avatarFallback: {
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -263,6 +285,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93'
   },
+  actions: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  zaloBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF20',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   callBtn: {
     width: 40,
     height: 40,
@@ -271,7 +305,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  callBtnText: {
+  actionIcon: {
     fontSize: 18
   }
 });

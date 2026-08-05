@@ -1,4 +1,9 @@
-import { formatVND, formatVNDShort } from '../CurrencyUtils';
+import {
+  formatVND,
+  formatVNDShort,
+  formatAmountInput,
+  parseAmountInput
+} from '../CurrencyUtils';
 
 describe('CurrencyUtils', () => {
   describe('formatVND', () => {
@@ -40,6 +45,32 @@ describe('CurrencyUtils', () => {
     it('formats small amounts with ₫ symbol', () => {
       const result = formatVNDShort(500);
       expect(result).toContain('₫');
+    });
+  });
+
+  describe('formatAmountInput', () => {
+    it('groups digits in threes', () => {
+      expect(formatAmountInput('60000000')).toBe('60,000,000');
+      expect(formatAmountInput(3500000)).toBe('3,500,000');
+      expect(formatAmountInput('999')).toBe('999');
+    });
+
+    it('ignores non-digits, leading zeros and empty input', () => {
+      expect(formatAmountInput('6a0,00b0')).toBe('60,000');
+      expect(formatAmountInput('0012')).toBe('12');
+      expect(formatAmountInput('')).toBe('');
+    });
+  });
+
+  describe('parseAmountInput', () => {
+    it('reads grouped text back as a number', () => {
+      expect(parseAmountInput('60,000,000')).toBe(60000000);
+      expect(parseAmountInput('3.500.000')).toBe(3500000);
+    });
+
+    it('returns 0 for empty or non-numeric input', () => {
+      expect(parseAmountInput('')).toBe(0);
+      expect(parseAmountInput('abc')).toBe(0);
     });
   });
 });

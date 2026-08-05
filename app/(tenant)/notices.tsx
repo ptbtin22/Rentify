@@ -388,7 +388,7 @@ export default function TenantNotices() {
           {/* Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setIsPosterProfileVisible(false)}>
-              <Text style={styles.modalCancel}>Close</Text>
+              <Text style={styles.modalCancel}>{local('close')}</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{local('profile')}</Text>
             <View style={{ width: 50 }} />

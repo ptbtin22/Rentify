@@ -182,7 +182,7 @@ export const translations: Record<string, Record<Language, string>> = {
   tenant_role: { en: "Linked Resident", vi: "Cư dân liên kết" },
   post_details: { en: "Post Details", vi: "Chi Tiết Tin Đăng" },
   landlord_name: { en: "Landlord", vi: "Chủ nhà" },
-  tenant_name: { en: "Jane Tenant", vi: "Jane Tenant" },
+  tenant_name: { en: "Nguyễn Thị An", vi: "Nguyễn Thị An" },
   like: { en: "Like", vi: "Thích" },
   comment: { en: "Comment", vi: "Bình luận" },
   comments: { en: "Comments", vi: "Bình luận" },
@@ -212,7 +212,7 @@ export const translations: Record<string, Record<Language, string>> = {
   welcome_back: { en: "Welcome Back 👋", vi: "Chào mừng trở lại 👋" },
   dashboard: { en: "Rentify Dashboard", vi: "Bảng điều khiển Rentify" },
   monthly_revenue: { en: "Monthly Revenue", vi: "Doanh thu tháng" },
-  unpaid_balance: { en: "Unpaid Balance", vi: "Dư nợ chưa thu" },
+  unpaid_balance: { en: "Unpaid Balance", vi: "Số tiền chưa thu" },
   occupancy_rate: { en: "Occupancy Rate", vi: "Tỷ lệ lấp đầy" },
   active_leases: { en: "Active Leases", vi: "Hợp đồng hiệu lực" },
   quick_actions: { en: "Quick Actions", vi: "Thao tác nhanh" },
@@ -313,7 +313,174 @@ export const translations: Record<string, Record<Language, string>> = {
   bank_redirect_msg: { en: "Opening bank app... Return here after transfer to confirm.", vi: "Đang mở ứng dụng ngân hàng... Quay lại đây sau khi chuyển khoản để xác nhận." },
   payment_confirmed: { en: "Payment Confirmed!", vi: "Xác nhận thanh toán thành công!" },
   payment_confirmed_desc: { en: "Your payment has been recorded. Your home page has been updated.", vi: "Đã ghi nhận thanh toán. Trang chủ của bạn đã được cập nhật." },
-  base_rent: { en: "Base Rent", vi: "Tiền phòng" }
+  base_rent: { en: "Base Rent", vi: "Tiền phòng" },
+
+  // VI UX feature keys
+  add_menu_room: { en: "Add Room", vi: "Thêm phòng" },
+  add_menu_complex: { en: "Add Complex", vi: "Thêm khu trọ" },
+  room_info: { en: "Room Info", vi: "Thông tin phòng" },
+  occupant_section: { en: "Current Occupant", vi: "Người đang ở" },
+  price_details: { en: "Price Details", vi: "Chi tiết giá" },
+  base_rent_label: { en: "Base rent", vi: "Giá cứng" },
+  electricity_rate_label: { en: "Electricity rate", vi: "Giá điện" },
+  water_rate_optional: { en: "Water (optional)", vi: "Giá nước" },
+  service_fee_optional: { en: "Service fee (optional)", vi: "Giá dịch vụ" },
+  parking_fee_optional: { en: "Parking (optional)", vi: "Giá xe" },
+  add_custom_fee: { en: "Add other fee", vi: "Thêm giá khác" },
+  custom_fee_name: { en: "Fee name", vi: "Tên khoản phí" },
+  custom_fee_amount: { en: "Amount (VND)", vi: "Số tiền (VNĐ)" },
+  zalo_number: { en: "Zalo number", vi: "Số Zalo" },
+  copy_from_phone: { en: "Copy from phone number", vi: "Sao chép từ số điện thoại" },
+  tenant_photo: { en: "Tenant photo", vi: "Ảnh người thuê" },
+  update_contract_photos: { en: "Update contract photos", vi: "Cập nhật ảnh hợp đồng" },
+  contract_last_updated: { en: "Last updated: {date}", vi: "Cập nhật lần cuối: {date}" },
+  contract_page_indicator: { en: "Page {current}/{total}", vi: "Trang {current}/{total}" },
+  no_occupant: { en: "No current tenant", vi: "Chưa có người thuê" },
+  call_action: { en: "Call", vi: "Gọi điện" },
+  email_action: { en: "Email", vi: "Gửi email" },
+  belongs_to_complex: { en: "Complex", vi: "Thuộc căn/khu" },
+  landlord_contact_name: { en: "Name", vi: "Họ tên" },
+  dash_empty: { en: "—", vi: "—" },
+  landlord_tab_dashboard: { en: "Dashboard", vi: "Tổng quan" },
+  landlord_tab_properties: { en: "Properties", vi: "Phòng" },
+  landlord_tab_tenants: { en: "Tenants", vi: "Người thuê" },
+  landlord_tab_payments: { en: "Payments", vi: "Thanh toán" },
+  landlord_tab_notices: { en: "Notices", vi: "Thông báo" },
+  save_prices: { en: "Save prices", vi: "Lưu giá" },
+  permission_required: { en: "Permission Required", vi: "Cần quyền truy cập" },
+  permission_library: { en: "Photo library access is needed.", vi: "Cần quyền truy cập thư viện ảnh." },
+
+  // Task 4: Properties room detail leftovers
+  email_label: { en: "Email", vi: "Email" },
+  address_label: { en: "Address", vi: "Địa chỉ" },
+  property_type_label: { en: "Type", vi: "Loại phòng" },
+  bedrooms_label: { en: "Bedrooms", vi: "Phòng ngủ" },
+  bathrooms_label: { en: "Bathrooms", vi: "Phòng tắm" },
+  remind_day_label: { en: "Remind Day", vi: "Ngày nhắc" },
+  remind_day_value: { en: "Day {day} of month", vi: "Ngày {day} hàng tháng" },
+  status_label: { en: "Status", vi: "Trạng thái" },
+  assign_tenant_action: { en: "👤 Assign Tenant / Create Lease", vi: "👤 Gán người thuê / Tạo hợp đồng" },
+  delete_property_title: { en: "Delete Property", vi: "Xóa phòng" },
+  delete_property_desc: { en: "Are you sure you want to delete this property? This will also remove any linked leases and payments.", vi: "Bạn có chắc chắn muốn xóa phòng này? Thao tác này sẽ đồng thời xóa các hợp đồng và thanh toán liên quan." },
+  delete_property_action: { en: "Delete Property", vi: "Xóa phòng" },
+  no_properties_title: { en: "No Properties", vi: "Chưa có phòng nào" },
+  no_properties_desc: { en: "Add your first rental property to get started.", vi: "Thêm phòng đầu tiên để bắt đầu." },
+  general_information: { en: "General Information", vi: "Thông tin chung" },
+  property_name_placeholder: { en: "Property Name (e.g. Oakridge Apt 4B)", vi: "Tên phòng (VD: Phòng 202)" },
+  address_placeholder: { en: "Address", vi: "Địa chỉ" },
+  financials_size_label: { en: "Financials & Size", vi: "Giá & Diện tích" },
+  monthly_rent_room_label: { en: "Monthly Rent (VND)", vi: "Giá phòng (VNĐ)" },
+  electricity_kwh_label: { en: "Electricity (VND/kWh)", vi: "Giá điện (VNĐ/kWh)" },
+  water_monthly_label: { en: "Water (Monthly, VND)", vi: "Giá nước (VNĐ/tháng)" },
+  service_fee_room_label: { en: "Service Fee (VND)", vi: "Giá dịch vụ (VNĐ)" },
+  remind_day_optional_label: { en: "Remind Day (1-28, optional)", vi: "Ngày nhắc phí (1-28, không bắt buộc)" },
+  bedrooms_count_label: { en: "Bedrooms: {count}", vi: "Phòng ngủ: {count}" },
+  bathrooms_count_label: { en: "Bathrooms: {count}", vi: "Phòng tắm: {count}" },
+  type_apartment: { en: "Apartment", vi: "Căn hộ" },
+  type_house: { en: "House", vi: "Nhà nguyên căn" },
+  type_condo: { en: "Condo", vi: "Chung cư" },
+  type_townhouse: { en: "Townhouse", vi: "Nhà phố" },
+  unknown_tenant: { en: "Unknown Tenant", vi: "Không rõ" },
+
+  // Task 5: Tenants — photo + Zalo + credentials modal
+  delete_tenant_title: { en: "Delete Tenant", vi: "Xóa người thuê" },
+  delete_tenant_desc: { en: "Are you sure you want to delete this tenant? This will also remove any linked leases and payments.", vi: "Bạn có chắc chắn muốn xóa người thuê này? Thao tác này sẽ đồng thời xóa các hợp đồng và thanh toán liên quan." },
+  choose_photo_action: { en: "Choose Photo", vi: "Chọn ảnh" },
+  tenant_created_title: { en: "Tenant Created!", vi: "Đã tạo người thuê!" },
+  share_credentials_desc: { en: "Share these credentials with the tenant so they can log in to their account.", vi: "Chia sẻ thông tin đăng nhập này với người thuê để họ có thể đăng nhập vào tài khoản." },
+  credential_name_label: { en: "Name:", vi: "Họ tên:" },
+  credential_phone_label: { en: "Phone:", vi: "Số điện thoại:" },
+  credential_password_label: { en: "Password:", vi: "Mật khẩu:" },
+  copy_credentials_action: { en: "📋 Copy Credentials", vi: "📋 Sao chép thông tin" },
+  copied_title: { en: "Copied", vi: "Đã sao chép" },
+  credentials_copied_desc: { en: "Credentials copied to clipboard!", vi: "Đã sao chép thông tin đăng nhập vào bộ nhớ tạm!" },
+  credentials_clipboard_text: { en: "Rentify Login Credentials:\nPhone: {phone}\nPassword: {password}\nPlease change your password in settings after logging in.", vi: "Thông tin đăng nhập Rentify:\nSố điện thoại: {phone}\nMật khẩu: {password}\nVui lòng đổi mật khẩu trong cài đặt sau khi đăng nhập." },
+
+  // Task 7: Hardcode sweep — New Lease modal, photo pickers, reminders, misc
+  property_tenant_section: { en: "Property & Tenant", vi: "Phòng & Người thuê" },
+  select_property_label: { en: "Select Property:", vi: "Chọn phòng:" },
+  select_tenant_label: { en: "Select Tenant:", vi: "Chọn người thuê:" },
+  lease_terms_section: { en: "Lease Terms", vi: "Thời hạn thuê" },
+  start_date_label: { en: "Start Date", vi: "Ngày bắt đầu" },
+  end_date_label: { en: "End Date", vi: "Ngày kết thúc" },
+  security_deposit_vnd_label: { en: "Security Deposit (VND)", vi: "Tiền cọc (VNĐ)" },
+  attachments_photos_section: { en: "Attachments & Photos", vi: "Đính kèm & Hình ảnh" },
+  uploaded_status: { en: "Uploaded", vi: "Đã tải lên" },
+  missing_status: { en: "Missing", vi: "Chưa có" },
+  upload_action: { en: "Upload", vi: "Tải lên" },
+  signed_contract_label: { en: "Signed Contract", vi: "Hợp đồng đã ký" },
+  lease_saved_title: { en: "Lease Agreement Saved", vi: "Đã lưu hợp đồng" },
+  lease_saved_desc: { en: "Lease has been activated. Invoices were generated.", vi: "Hợp đồng đã được kích hoạt. Hóa đơn đã được tạo." },
+  reminders_title: { en: "Reminders", vi: "Nhắc phí" },
+  all_invoices_paid: { en: "All invoices are fully paid. No reminders needed!", vi: "Tất cả hóa đơn đã được thanh toán. Không cần nhắc phí!" },
+  rent_reminder_push_title: { en: "⚡ Rent Reminder Dispatched", vi: "⚡ Đã gửi nhắc tiền phòng" },
+  rent_reminder_push_body: { en: "Sent rent reminders to {count} rooms with outstanding balances.", vi: "Đã gửi nhắc tiền phòng đến {count} phòng còn nợ." },
+  reminders_dispatched_title: { en: "Reminders Dispatched", vi: "Đã Gửi Nhắc Phí" },
+  reminders_dispatched_desc: { en: "Rent invoice reminders successfully sent to {count} unpaid rooms via Push & Zalo.", vi: "Đã gửi nhắc phí thành công đến {count} phòng chưa thanh toán qua Push & Zalo." },
+  performance_insights: { en: "Performance Insights", vi: "Phân Tích Hiệu Suất" },
+  phone_label: { en: "Phone", vi: "Số điện thoại" },
+  gallery_action: { en: "Gallery", vi: "Thư viện ảnh" },
+  select_meter_photo_source_title: { en: "Select Meter Photo Source", vi: "Chọn nguồn ảnh công tơ điện" },
+  select_meter_photo_source_desc: { en: "Choose how you want to upload the meter photo:", vi: "Chọn cách bạn muốn tải lên ảnh công tơ điện:" },
+  photo_library_action: { en: "Photo Library", vi: "Thư viện ảnh" },
+  browse_files_action: { en: "Browse Files", vi: "Duyệt tệp" },
+  permission_camera_photos: { en: "Camera access is needed to take photos.", vi: "Cần quyền truy cập máy ảnh để chụp ảnh." },
+  permission_library_attach: { en: "Photo library access is needed to attach images.", vi: "Cần quyền truy cập thư viện ảnh để đính kèm hình ảnh." },
+  take_photo_action: { en: "Take Photo", vi: "Chụp ảnh" },
+  choose_from_library_action: { en: "Choose from Library", vi: "Chọn từ thư viện" },
+  select_attachment_source_title: { en: "Select Attachment Source", vi: "Chọn nguồn đính kèm" },
+  select_attachment_source_desc: { en: "Choose how you want to upload the document:", vi: "Chọn cách bạn muốn tải lên tài liệu:" },
+  switch_active_rental_unit_title: { en: "Switch Active Rental Unit", vi: "Chuyển phòng đang hoạt động" },
+  switch_active_room_title: { en: "Switch Active Room", vi: "Chuyển phòng" },
+  choose_room_context_desc: { en: "Choose a room context:", vi: "Chọn phòng:" },
+  call_failed_title: { en: "Call Failed", vi: "Gọi điện thất bại" },
+  call_failed_desc: { en: "Phone calls are not supported on this simulator/device.", vi: "Thiết bị/trình giả lập này không hỗ trợ gọi điện." },
+  remind_day_khu_optional_label: { en: "Complex Remind Day (1-28, optional)", vi: "Ngày nhắc phí khu trọ (1-28, không bắt buộc)" },
+
+  // Final-review fixes: validation, room number, OCR helper, performance insights
+  room_number: { en: "Room number", vi: "Số phòng" },
+  required_title: { en: "Required", vi: "Yêu cầu" },
+  khu_fields_required_desc: { en: "Both fields (complex name and address) are required.", vi: "Vui lòng điền đầy đủ cả hai trường tên và địa chỉ." },
+  ocr_helper_text: { en: "* Index extracted using camera OCR. You can manually edit it if the recognition is incorrect.", vi: "* Chỉ số được trích xuất bằng camera OCR. Bạn có thể tự chỉnh sửa tay nếu nhận diện sai." },
+  insight_occupancy_text: { en: "💡 Your occupancy rate is currently sitting at {rate}%.", vi: "💡 Tỷ lệ lấp đầy hiện tại đang ở mức {rate}%." },
+  insight_revenue_text: { en: "Filling vacant rooms could boost monthly revenue by up to {amount}.", vi: "Việc lấp đầy phòng trống có thể giúp tăng doanh thu hàng tháng thêm đến {amount}." },
+  invalid_price_title: { en: "Invalid Price", vi: "Giá không hợp lệ" },
+  invalid_price_desc: { en: "Please enter a valid rent and electricity rate before saving.", vi: "Vui lòng nhập giá phòng và giá điện hợp lệ trước khi lưu." },
+  invalid_fee_title: { en: "Invalid Fee", vi: "Khoản phí không hợp lệ" },
+  invalid_fee_desc: { en: "Please enter a valid fee name and amount.", vi: "Vui lòng nhập tên và số tiền hợp lệ cho khoản phí." },
+
+  // Invite code + create lease + room detail + OCR meter
+  get_tenant_code: { en: "Get tenant code", vi: "Lấy mã người thuê" },
+  tenant_code_label: { en: "Your tenant code", vi: "Mã người thuê của bạn" },
+  tenant_code_expires_in: { en: "Expires in {seconds}s", vi: "Hết hạn sau {seconds} giây" },
+  tenant_code_expired: { en: "Code expired. Get a new one.", vi: "Mã đã hết hạn. Hãy lấy mã mới." },
+  copy_code: { en: "Copy code", vi: "Sao chép mã" },
+  code_copied: { en: "Code copied", vi: "Đã sao chép mã" },
+  contract_photos_count: { en: "{count} photo(s)", vi: "{count} ảnh" },
+  enter_tenant_code: { en: "Tenant code (4 digits)", vi: "Mã người thuê (4 số)" },
+  tenant_code_invalid: { en: "The phone number and code do not match.", vi: "Số điện thoại và mã không khớp." },
+  tenant_code_hint: {
+    en: "The tenant reads this code from their profile.",
+    vi: "Người thuê lấy mã này trong trang cá nhân của họ."
+  },
+  tenant_code_needs_phone: {
+    en: "Enter a valid phone number first, then the tenant code.",
+    vi: "Nhập số điện thoại hợp lệ trước, sau đó nhập mã người thuê."
+  },
+  select_complex_first: { en: "Select complex first", vi: "Chọn khu trọ trước" },
+  search_complex: { en: "Search complexes...", vi: "Tìm khu trọ..." },
+  search_room: { en: "Search rooms...", vi: "Tìm phòng..." },
+  search_tenant: { en: "Search tenants...", vi: "Tìm người thuê..." },
+  create_lease_title: { en: "Create lease", vi: "Tạo hợp đồng" },
+  room_tab_info: { en: "Room info", vi: "Thông tin phòng" },
+  room_tab_payments: { en: "Payment history", vi: "Lịch sử thanh toán" },
+  room_tab_leases: { en: "Lease history", vi: "Lịch sử hợp đồng" },
+  meter_prev_reading: { en: "Previous month reading", vi: "Chỉ số điện tháng trước" },
+  meter_curr_reading: { en: "This month reading", vi: "Chỉ số điện tháng này" },
+  meter_consumption: { en: "kWh used", vi: "Số kí điện sử dụng" },
+  meter_manual_confirm: { en: "I confirm the manually entered kWh reading is accurate", vi: "Tôi xác nhận số kí điện đã nhập tay là chính xác" },
+  meter_photo_label: { en: "Meter photo", vi: "Ảnh đồng hồ điện" },
+  please_confirm_manual_meter: { en: "Please confirm the manual reading before continuing.", vi: "Vui lòng xác nhận số đã nhập tay trước khi tiếp tục." },
 };
 
 // Check device language automatically (Q1 requirement)
@@ -340,6 +507,14 @@ export const setLanguage = (lang: Language) => {
   listeners.forEach(listener => listener(lang));
 };
 
+export const localF = (key: string, vars: Record<string, string | number>): string => {
+  let str = translations[key]?.[globalLanguage] ?? key;
+  Object.entries(vars).forEach(([k, v]) => {
+    str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+  });
+  return str;
+};
+
 export const useLanguage = () => {
   const [lang, setLang] = useState<Language>(globalLanguage);
 
@@ -354,5 +529,13 @@ export const useLanguage = () => {
     return translations[key]?.[lang] ?? key;
   };
 
-  return { language: lang, setLanguage, local };
+  const localFWithLang = (key: string, vars: Record<string, string | number>): string => {
+    let str = translations[key]?.[lang] ?? key;
+    Object.entries(vars).forEach(([k, v]) => {
+      str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    });
+    return str;
+  };
+
+  return { language: lang, setLanguage, local, localF: localFWithLang };
 };

@@ -8,8 +8,11 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../../services/LanguageManager';
 
 export default function LandlordLayout() {
+  const { local } = useLanguage();
+
   return (
     <Tabs
       screenOptions={{
@@ -26,7 +29,7 @@ export default function LandlordLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: local('landlord_tab_dashboard'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid" size={size} color={color} />
           )
@@ -35,7 +38,7 @@ export default function LandlordLayout() {
       <Tabs.Screen
         name="properties"
         options={{
-          title: 'Properties',
+          title: local('landlord_tab_properties'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="business" size={size} color={color} />
           )
@@ -44,7 +47,7 @@ export default function LandlordLayout() {
       <Tabs.Screen
         name="tenants"
         options={{
-          title: 'Tenants',
+          title: local('landlord_tab_tenants'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
           )
@@ -53,7 +56,7 @@ export default function LandlordLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Payments',
+          title: local('landlord_tab_payments'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="card" size={size} color={color} />
           )
@@ -62,10 +65,24 @@ export default function LandlordLayout() {
       <Tabs.Screen
         name="notices"
         options={{
-          title: 'Notices',
+          title: local('landlord_tab_notices'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications" size={size} color={color} />
           )
+        }}
+      />
+      <Tabs.Screen
+        name="create-lease"
+        options={{
+          href: null,
+          headerShown: false
+        }}
+      />
+      <Tabs.Screen
+        name="room-detail"
+        options={{
+          href: null,
+          headerShown: false
         }}
       />
     </Tabs>

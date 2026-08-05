@@ -17,7 +17,8 @@ import {
   Alert,
   ScrollView,
   Linking,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Database, Tenant, Lease, Payment } from '../../services/Database';
@@ -27,10 +28,17 @@ import { useRouter } from 'expo-router';
 import { PhoneInput } from '../../components/PhoneInput';
 import { validatePhone } from '../../services/PhoneUtils';
 import { formatVND } from '../../services/CurrencyUtils';
-import Clipboard from '@react-native-clipboard/clipboard';
- 
+import { getInitials } from '../../services/nameUtils';
+import { excludeFuturePayments } from '../../services/paymentUtils';
+import { verifyCodeForPhone } from '../../services/TenantInviteCode';
+import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
+
+const phoneDigits = (raw: string) =>
+  raw.replace(/\D/g, '').replace(/^84/, '').replace(/^0/, '');
+
 export default function LandlordTenants() {
-  const { local, language } = useLanguage();
+  const { local, localF, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
   const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -52,6 +60,9 @@ export default function LandlordTenants() {
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState('+84');
   const [notes, setNotes] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | undefined>();
+  const [zalo, setZalo] = useState('');
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
 
   const refreshData = () => {
     setTenants([...Database.getTenants()]);
@@ -66,12 +77,50 @@ export default function LandlordTenants() {
     return unsubscribe;
   }, []);
 
+  const resetAddForm = () => {
+    setName('');
+    setEmail('');
+    setPhone('');
+    setCountryCode('+84');
+    setNotes('');
+    setPhotoUri(undefined);
+    setZalo('');
+    setInviteCodeInput('');
+  };
+
+  const phoneIsValid = validatePhone(phone, countryCode) === null;
+  const codeIsValid = /^\d{4}$/.test(inviteCodeInput.trim());
+  const canSubmit = !!name.trim() && phoneIsValid && codeIsValid;
+
   const handleSave = () => {
     if (!name.trim()) return;
-    const phoneError = validatePhone(phone, countryCode);
-    if (phoneError) return; // phone not yet complete
+    if (!phoneIsValid) return;
 
     const fullPhone = countryCode + phone;
+    const fullZalo = zalo ? countryCode + zalo : undefined;
+    const matchDigits = phoneDigits(fullPhone);
+
+    // Demo: any 4-digit code is accepted, but it must pair with a valid phone number.
+    if (!verifyCodeForPhone(fullPhone, inviteCodeInput)) {
+      Alert.alert(local('tenant_code_invalid'));
+      return;
+    }
+
+    const existing = tenants.find(t => phoneDigits(t.phone) === matchDigits);
+
+    if (existing) {
+      Database.updateTenant(existing.id, {
+        name,
+        email,
+        phone: fullPhone,
+        notes,
+        photoUri,
+        zalo: fullZalo
+      });
+      resetAddForm();
+      setIsAddVisible(false);
+      return;
+    }
 
     const tempPassword = 'RT-' + Math.floor(1000 + Math.random() * 9000);
     Database.addTenant({
@@ -79,29 +128,43 @@ export default function LandlordTenants() {
       email,
       phone: fullPhone,
       notes,
-      password: tempPassword
+      password: tempPassword,
+      photoUri,
+      zalo: fullZalo
     });
 
     setCreatedCredentials({ name, phone: fullPhone, password: tempPassword });
     setIsCredentialsModalVisible(true);
 
-    // Reset Form
-    setName('');
-    setEmail('');
-    setPhone('');
-    setCountryCode('+84');
-    setNotes('');
+    resetAddForm();
     setIsAddVisible(false);
+  };
+
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(local('permission_required'), local('permission_library'));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1]
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setPhotoUri(result.assets[0].uri);
+    }
   };
 
   const handleDelete = (id: string) => {
     Alert.alert(
-      'Delete Tenant',
-      'Are you sure you want to delete this tenant? This will also remove any linked leases and payments.',
+      local('delete_tenant_title'),
+      local('delete_tenant_desc'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: local('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: local('delete'),
           style: 'destructive',
           onPress: () => {
             Database.deleteTenant(id);
@@ -127,8 +190,7 @@ export default function LandlordTenants() {
 
   const getTenantPaymentHistory = (tenantId: string) => {
     const tenantLeaseIds = leases.filter(l => l.tenantId === tenantId).map(l => l.id);
-    return payments
-      .filter(p => tenantLeaseIds.includes(p.leaseId))
+    return excludeFuturePayments(payments.filter(p => tenantLeaseIds.includes(p.leaseId)))
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   };
 
@@ -137,8 +199,8 @@ export default function LandlordTenants() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('tenants')}</Text>
-        <TouchableOpacity onPress={() => setIsAddVisible(true)}>
-          <Text style={[styles.addText, { fontSize: adjustSize(14) }]}>➕ {local('add_room').replace(' phòng', '')}</Text>
+        <TouchableOpacity onPress={() => { resetAddForm(); setIsAddVisible(true); }}>
+          <Text style={[styles.addText, { fontSize: adjustSize(14) }]}>➕ {local('add_tenant')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -158,9 +220,15 @@ export default function LandlordTenants() {
           const activeLeases = leases.filter(l => l.tenantId === item.id && l.status === 'active');
           return (
             <TouchableOpacity style={styles.card} onPress={() => setSelectedTenant(item)}>
-              <View style={styles.iconContainer}>
-                <Text style={styles.iconText}>👤</Text>
-              </View>
+              {item.photoUri ? (
+                <Image source={{ uri: item.photoUri }} style={styles.cardAvatar} />
+              ) : (
+                <View style={[styles.cardAvatar, styles.avatarPlaceholder]}>
+                  <Text style={[styles.cardAvatarInitials, { fontSize: adjustSize(16) }]}>
+                    {getInitials(item.name)}
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.details}>
                 <Text style={[styles.name, { fontSize: adjustSize(15) }]}>{item.name}</Text>
@@ -200,8 +268,8 @@ export default function LandlordTenants() {
               <Text style={styles.modalTitle}>{local('add_tenant')}</Text>
               <TouchableOpacity
                 onPress={handleSave}
-                disabled={!name.trim() || validatePhone(phone, countryCode) !== null}
-                style={(!name.trim() || validatePhone(phone, countryCode) !== null) && { opacity: 0.5 }}
+                disabled={!canSubmit}
+                style={!canSubmit && { opacity: 0.5 }}
               >
                 <Text style={styles.modalSave}>{local('save')}</Text>
               </TouchableOpacity>
@@ -240,6 +308,55 @@ export default function LandlordTenants() {
                 onChangeCountry={setCountryCode}
               />
 
+              <View style={[styles.inputBox, { marginTop: 12 }]}>
+                <TextInput
+                  style={[styles.textInput, { fontSize: adjustSize(14) }]}
+                  placeholder={local('zalo_number')}
+                  placeholderTextColor="#8E8E93"
+                  keyboardType="phone-pad"
+                  value={zalo}
+                  onChangeText={setZalo}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.copyFromPhoneBtn}
+                onPress={() => setZalo(phone)}
+              >
+                <Text style={[styles.copyFromPhoneBtnText, { fontSize: adjustSize(13) }]}>{local('copy_from_phone')}</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('enter_tenant_code')}</Text>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={[styles.textInput, { fontSize: adjustSize(14), letterSpacing: 4 }]}
+                  placeholder="1234"
+                  placeholderTextColor="#8E8E93"
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  editable={phoneIsValid}
+                  value={inviteCodeInput}
+                  onChangeText={(v) => setInviteCodeInput(v.replace(/\D/g, ''))}
+                />
+              </View>
+              <Text style={[styles.helperText, { fontSize: adjustSize(12) }]}>
+                {phoneIsValid ? local('tenant_code_hint') : local('tenant_code_needs_phone')}
+              </Text>
+
+              <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('tenant_photo')}</Text>
+              <View style={styles.photoRow}>
+                {photoUri ? (
+                  <Image source={{ uri: photoUri }} style={styles.avatarPreview} />
+                ) : (
+                  <View style={[styles.avatarPreview, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarPlaceholderIcon}>👤</Text>
+                  </View>
+                )}
+                <TouchableOpacity style={styles.choosePhotoBtn} onPress={handlePickPhoto}>
+                  <Text style={[styles.choosePhotoBtnText, { fontSize: adjustSize(13) }]}>{local('choose_photo_action')}</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('notes')}</Text>
               <View style={styles.notesBox}>
                 <TextInput
@@ -272,6 +389,16 @@ export default function LandlordTenants() {
               </View>
 
               <ScrollView style={styles.formScroll}>
+                <View style={styles.avatarDetailWrap}>
+                  {selectedTenant.photoUri ? (
+                    <Image source={{ uri: selectedTenant.photoUri }} style={styles.avatarDetail} />
+                  ) : (
+                    <View style={[styles.avatarDetail, styles.avatarPlaceholder]}>
+                      <Text style={styles.avatarPlaceholderIconLarge}>👤</Text>
+                    </View>
+                  )}
+                </View>
+
                 <Text style={[styles.label, { fontSize: adjustSize(12) }]}>{local('contact_details')}</Text>
                 <View style={styles.detailContainer}>
                   <View style={styles.detailRow}>
@@ -279,18 +406,25 @@ export default function LandlordTenants() {
                     <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.name}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>Email</Text>
+                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('email_label')}</Text>
                     <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.email}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('phone_number').replace(' SỐ ĐIỆN THOẠI', '').replace('PHONE NUMBER', 'Phone')}</Text>
+                    <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('phone_label')}</Text>
                     <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.phone || 'N/A'}</Text>
                   </View>
-                  {selectedTenant.phone ? (
+                  {selectedTenant.zalo ? (
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('zalo_number')}</Text>
+                      <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>{selectedTenant.zalo}</Text>
+                    </View>
+                  ) : null}
+                  {(selectedTenant.zalo || selectedTenant.phone) ? (
                     <TouchableOpacity
                       style={styles.zaloBtn}
                       onPress={() => {
-                        const cleanPhone = selectedTenant.phone.replace(/[^0-9]/g, '');
+                        const target = selectedTenant.zalo || selectedTenant.phone;
+                        const cleanPhone = target.replace(/[^0-9]/g, '');
                         Linking.openURL(`https://zalo.me/${cleanPhone}`);
                       }}
                     >
@@ -322,20 +456,19 @@ export default function LandlordTenants() {
                   </View>
                 )}
 
-                {getTenantLeases(selectedTenant.id).length === 0 && (
-                  <TouchableOpacity
-                    style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12 }]}
-                    onPress={() => {
-                      setSelectedTenant(null);
-                      router.replace({
-                        pathname: '/(landlord)/payments',
-                        params: { openNewLease: 'true', tenantId: selectedTenant.id }
-                      });
-                    }}
-                  >
-                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>🔑 {local('new_lease_title')}</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12 }]}
+                  onPress={() => {
+                    const tid = selectedTenant.id;
+                    setSelectedTenant(null);
+                    router.push({
+                      pathname: '/(landlord)/create-lease',
+                      params: { tenantId: tid }
+                    });
+                  }}
+                >
+                  <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>🔑 {local('create_lease_title')}</Text>
+                </TouchableOpacity>
 
                 {/* Payment History Section */}
                 <Text style={[styles.label, { fontSize: adjustSize(12), marginTop: 8 }]}>{local('payment_history')}</Text>
@@ -410,22 +543,22 @@ export default function LandlordTenants() {
         <View style={styles.modalOverlay}>
           <View style={styles.successModalContent}>
             <Text style={styles.successIcon}>🎉</Text>
-            <Text style={styles.successTitle}>Tenant Created!</Text>
+            <Text style={styles.successTitle}>{local('tenant_created_title')}</Text>
             <Text style={styles.successDesc}>
-              Share these credentials with the tenant so they can log in to their account.
+              {local('share_credentials_desc')}
             </Text>
             
             <View style={styles.credentialsCard}>
               <View style={styles.credentialRow}>
-                <Text style={styles.credentialLabel}>Name:</Text>
+                <Text style={styles.credentialLabel}>{local('credential_name_label')}</Text>
                 <Text style={styles.credentialValue}>{createdCredentials?.name}</Text>
               </View>
               <View style={styles.credentialRow}>
-                <Text style={styles.credentialLabel}>Phone:</Text>
+                <Text style={styles.credentialLabel}>{local('credential_phone_label')}</Text>
                 <Text style={styles.credentialValue}>{createdCredentials?.phone || 'N/A'}</Text>
               </View>
               <View style={styles.credentialRow}>
-                <Text style={styles.credentialLabel}>Password:</Text>
+                <Text style={styles.credentialLabel}>{local('credential_password_label')}</Text>
                 <Text style={[styles.credentialValue, styles.tempPasswordText]}>
                   {createdCredentials?.password}
                 </Text>
@@ -434,21 +567,24 @@ export default function LandlordTenants() {
 
             <TouchableOpacity
               style={styles.copyButton}
-              onPress={() => {
-                Clipboard.setString(
-                  `Rentify Login Credentials:\nPhone: ${createdCredentials?.phone}\nPassword: ${createdCredentials?.password}\nPlease change your password in settings after logging in.`
+              onPress={async () => {
+                await Clipboard.setStringAsync(
+                  localF('credentials_clipboard_text', {
+                    phone: createdCredentials?.phone || '',
+                    password: createdCredentials?.password || ''
+                  })
                 );
-                Alert.alert('Copied', 'Credentials copied to clipboard!');
+                Alert.alert(local('copied_title'), local('credentials_copied_desc'));
               }}
             >
-              <Text style={styles.copyButtonText}>📋 Copy Credentials</Text>
+              <Text style={styles.copyButtonText}>{local('copy_credentials_action')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.successCloseBtn}
               onPress={() => setIsCredentialsModalVisible(false)}
             >
-              <Text style={styles.successCloseBtnText}>Close</Text>
+              <Text style={styles.successCloseBtnText}>{local('close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -513,17 +649,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center'
   },
-  iconContainer: {
+  cardAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 10,
-    backgroundColor: '#5856D61A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12
+    borderRadius: 22,
+    marginRight: 12,
+    backgroundColor: '#5856D61A'
   },
-  iconText: {
-    fontSize: 22
+  cardAvatarInitials: {
+    fontWeight: '800',
+    color: '#5856D6'
   },
   details: {
     flex: 1
@@ -620,6 +755,69 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: '#1C1C1E'
+  },
+  helperText: {
+    color: '#8E8E93',
+    marginTop: -6,
+    marginBottom: 12,
+    paddingHorizontal: 4
+  },
+  copyFromPhoneBtn: {
+    height: 40,
+    backgroundColor: '#007AFF1A',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12
+  },
+  copyFromPhoneBtnText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 12
+  },
+  avatarPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 32
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  avatarPlaceholderIcon: {
+    fontSize: 28
+  },
+  avatarPlaceholderIconLarge: {
+    fontSize: 40
+  },
+  choosePhotoBtn: {
+    height: 40,
+    paddingHorizontal: 16,
+    backgroundColor: '#007AFF1A',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  choosePhotoBtnText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  avatarDetailWrap: {
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  avatarDetail: {
+    width: 88,
+    height: 88,
+    borderRadius: 44
   },
   detailContainer: {
     backgroundColor: '#F2F2F7',

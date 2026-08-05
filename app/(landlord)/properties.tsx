@@ -16,14 +16,23 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  Animated
+  Animated,
+  ActionSheetIOS,
+  Platform,
+  Image,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Database, Property, PropertyType, Lease, Tenant, KhuTro } from '../../services/Database';
+import * as ImagePicker from 'expo-image-picker';
+import { Database, Property, PropertyType, Lease, Tenant, KhuTro, CustomFee, getLeaseContractPhotos } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
 import { formatVND } from '../../services/CurrencyUtils';
+
+const CONTRACT_PAGE_WIDTH = Dimensions.get('window').width - 32;
 
 export default function LandlordProperties() {
   const router = useRouter();
@@ -34,10 +43,22 @@ export default function LandlordProperties() {
 
   // Modals
   const [isAddVisible, setIsAddVisible] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isKhuModalVisible, setIsKhuModalVisible] = useState(false);
-  // Room payment history modal
+  // Unified room detail modal (stats + payment history + occupant + prices + contract)
   const [historyProperty, setHistoryProperty] = useState<Property | null>(null);
+
+  // Price details edit state (populated from historyProperty when the detail modal opens)
+  const [editRent, setEditRent] = useState('');
+  const [editElectric, setEditElectric] = useState('');
+  const [editWater, setEditWater] = useState('');
+  const [editService, setEditService] = useState('');
+  const [editParking, setEditParking] = useState('');
+  const [editCustomFees, setEditCustomFees] = useState<CustomFee[]>([]);
+  const [newFeeName, setNewFeeName] = useState('');
+  const [newFeeAmount, setNewFeeAmount] = useState('');
+
+  // Contract pager state
+  const [contractPageIndex, setContractPageIndex] = useState(0);
 
   // Form Fields for Room
   const [name, setName] = useState('');
@@ -81,7 +102,7 @@ export default function LandlordProperties() {
   // Filtering
   const [selectedKhuFilterId, setSelectedKhuFilterId] = useState<'all' | string>('all');
   
-  const { local, language } = useLanguage();
+  const { local, localF, language } = useLanguage();
   const { isEasyView, adjustSize } = useEasyViewMode();
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
   const [rentAmount, setRentAmount] = useState('1500');
@@ -149,16 +170,16 @@ export default function LandlordProperties() {
 
   const handleDelete = (id: string) => {
     Alert.alert(
-      'Delete Property',
-      'Are you sure you want to delete this property? This will also remove any linked leases and payments.',
+      local('delete_property_title'),
+      local('delete_property_desc'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: local('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: local('delete'),
           style: 'destructive',
           onPress: () => {
             Database.deleteProperty(id);
-            setSelectedProperty(null);
+            setHistoryProperty(null);
           }
         }
       ]
@@ -167,10 +188,7 @@ export default function LandlordProperties() {
 
   const handleSaveKhu = () => {
     if (!newKhuName.trim() || !newKhuAddress.trim()) {
-      Alert.alert(
-        language === 'vi' ? 'Yêu cầu' : 'Required',
-        language === 'vi' ? 'Vui lòng điền đầy đủ cả hai trường tên và địa chỉ.' : 'Both fields (complex name and address) are required.'
-      );
+      Alert.alert(local('required_title'), local('khu_fields_required_desc'));
       return;
     }
     const remindDayNum = Number(newKhuRemindDay);
@@ -189,12 +207,12 @@ export default function LandlordProperties() {
 
   const handleDeleteKhu = (id: string) => {
     Alert.alert(
-      'Xóa Khu Trọ',
-      'Xóa khu trọ này sẽ đồng thời xóa toàn bộ các phòng và hợp đồng nằm trong khu. Bạn có chắc muốn tiếp tục?',
+      local('delete_complex_title'),
+      local('delete_complex_desc'),
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: local('cancel'), style: 'cancel' },
         { 
-          text: 'Xóa', 
+          text: local('delete'), 
           style: 'destructive', 
           onPress: () => {
             Database.deleteKhuTro(id);
@@ -215,7 +233,7 @@ export default function LandlordProperties() {
         const tenant = tenants.find(t => t.id === l.tenantId);
         return {
           ...l,
-          tenantName: tenant ? tenant.name : 'Unknown Tenant'
+          tenantName: tenant ? tenant.name : local('unknown_tenant')
         };
       });
   };
@@ -239,9 +257,151 @@ export default function LandlordProperties() {
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   };
 
+  // Current active tenant + lease for a room (null when vacant)
+  const getActiveOccupant = (propId: string) => {
+    const lease = leases.find(l => l.propertyId === propId && l.status === 'active');
+    if (!lease) return null;
+    const tenant = tenants.find(t => t.id === lease.tenantId);
+    return tenant ? { tenant, lease } : null;
+  };
+
+  const typeLabel = (t: PropertyType) => {
+    switch (t) {
+      case 'Apartment': return local('type_apartment');
+      case 'House': return local('type_house');
+      case 'Condo': return local('type_condo');
+      case 'Townhouse': return local('type_townhouse');
+      default: return t;
+    }
+  };
+
+  // Populate editable price fields whenever the detail modal opens for a room
+  useEffect(() => {
+    if (!historyProperty) return;
+    setEditRent(String(historyProperty.rentAmount ?? ''));
+    setEditElectric(String(historyProperty.electricityRate ?? ''));
+    setEditWater(historyProperty.waterRate ? String(historyProperty.waterRate) : '');
+    setEditService(historyProperty.serviceFee ? String(historyProperty.serviceFee) : '');
+    setEditParking(historyProperty.parkingFee !== undefined ? String(historyProperty.parkingFee) : '');
+    setEditCustomFees(historyProperty.customFees ? [...historyProperty.customFees] : []);
+    setNewFeeName('');
+    setNewFeeAmount('');
+    setContractPageIndex(0);
+  }, [historyProperty]);
+
+  const handleSavePrices = () => {
+    if (!historyProperty) return;
+    if (!editRent.trim() || isNaN(Number(editRent)) || Number(editRent) <= 0 ||
+        !editElectric.trim() || isNaN(Number(editElectric)) || Number(editElectric) <= 0) {
+      Alert.alert(local('invalid_price_title'), local('invalid_price_desc'));
+      return;
+    }
+    const updates: Partial<Property> = {
+      rentAmount: Number(editRent) || 0,
+      electricityRate: Number(editElectric) || 0,
+      waterRate: editWater === '' ? 0 : Number(editWater) || 0,
+      serviceFee: editService === '' ? 0 : Number(editService) || 0,
+      parkingFee: editParking === '' ? undefined : Number(editParking) || 0,
+      customFees: editCustomFees,
+    };
+    Database.updateProperty(historyProperty.id, updates);
+    setHistoryProperty({ ...historyProperty, ...updates });
+    showToast(local('save_prices'));
+  };
+
+  const handleAddCustomFee = () => {
+    if (!newFeeName.trim() || !newFeeAmount.trim() || isNaN(Number(newFeeAmount)) || Number(newFeeAmount) <= 0) {
+      Alert.alert(local('invalid_fee_title'), local('invalid_fee_desc'));
+      return;
+    }
+    const fee: CustomFee = {
+      id: 'fee-' + Math.random().toString(36).substring(7),
+      name: newFeeName.trim(),
+      amount: Number(newFeeAmount)
+    };
+    setEditCustomFees(prev => [...prev, fee]);
+    setNewFeeName('');
+    setNewFeeAmount('');
+  };
+
+  const handleRemoveCustomFee = (feeId: string) => {
+    setEditCustomFees(prev => prev.filter(f => f.id !== feeId));
+  };
+
+  const handleUpdateContractPhotos = async (lease: Lease) => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(local('permission_required'), local('permission_library'));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const uris = result.assets.map(a => a.uri);
+      Database.updateLeaseContractPhotos(lease.id, uris);
+      setContractPageIndex(0);
+    }
+  };
+
+  const handleContractScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const width = e.nativeEvent.layoutMeasurement.width || CONTRACT_PAGE_WIDTH;
+    const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+    setContractPageIndex(idx);
+  };
+
   const filteredProperties = properties.filter(
     p => selectedKhuFilterId === 'all' || p.khuTroId === selectedKhuFilterId
   );
+
+  // When no complex filter is active, group rooms per complex and inject a divider before each group
+  type RoomListItem =
+    | { type: 'divider'; key: string; label: string }
+    | { type: 'room'; key: string; data: Property };
+
+  const roomListItems: RoomListItem[] = [];
+  if (selectedKhuFilterId === 'all') {
+    const orderedKhuIds = [
+      ...khuTros.map(k => k.id),
+      ...filteredProperties.map(p => p.khuTroId).filter(id => !khuTros.some(k => k.id === id))
+    ];
+    const seen = new Set<string>();
+    orderedKhuIds.forEach(khuId => {
+      if (seen.has(khuId)) return;
+      seen.add(khuId);
+      const rooms = filteredProperties.filter(p => p.khuTroId === khuId);
+      if (rooms.length === 0) return;
+      roomListItems.push({
+        type: 'divider',
+        key: `khu-div-${khuId}`,
+        label: khuTros.find(k => k.id === khuId)?.name || local('complex')
+      });
+      rooms.forEach(r => roomListItems.push({ type: 'room', key: r.id, data: r }));
+    });
+  } else {
+    filteredProperties.forEach(r => roomListItems.push({ type: 'room', key: r.id, data: r }));
+  }
+
+  const openAddMenu = () => {
+    const options = [local('cancel'), local('add_menu_room'), local('add_menu_complex')];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 0 },
+        (idx) => {
+          if (idx === 1) setIsAddVisible(true);
+          if (idx === 2) setIsKhuModalVisible(true);
+        }
+      );
+    } else {
+      Alert.alert(local('add_room'), undefined, [
+        { text: local('add_menu_room'), onPress: () => setIsAddVisible(true) },
+        { text: local('add_menu_complex'), onPress: () => setIsKhuModalVisible(true) },
+        { text: local('cancel'), style: 'cancel' },
+      ]);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -249,19 +409,12 @@ export default function LandlordProperties() {
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('properties') || 'Properties'}</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.khuManageBtn} 
-            onPress={() => setIsKhuModalVisible(true)}
-            accessibilityLabel={local('manage_complexes')}
+          <TouchableOpacity
+            style={styles.addBtnHeader}
+            onPress={openAddMenu}
+            accessibilityLabel={local('add_room')}
           >
-            <Text style={[styles.khuManageText, { fontSize: adjustSize(16) }]}>⚙️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addBtnHeader} 
-            onPress={() => setIsAddVisible(true)}
-            accessibilityLabel={local('add_room') || 'Add Room'}
-          >
-            <Text style={[styles.addText, { fontSize: adjustSize(16) }]}>➕</Text>
+            <Text style={[styles.addText, { fontSize: adjustSize(16) }]}>＋</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -294,17 +447,27 @@ export default function LandlordProperties() {
 
       {/* Properties List */}
       <FlatList
-        data={filteredProperties}
-        keyExtractor={item => item.id}
+        data={roomListItems}
+        keyExtractor={entry => entry.key}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyView}>
             <Text style={styles.emptyIcon}>🏠</Text>
-            <Text style={styles.emptyTitle}>No Properties</Text>
-            <Text style={styles.emptyDesc}>Add your first rental property to get started.</Text>
+            <Text style={styles.emptyTitle}>{local('no_properties_title')}</Text>
+            <Text style={styles.emptyDesc}>{local('no_properties_desc')}</Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item: entry }) => {
+          if (entry.type === 'divider') {
+            return (
+              <View style={styles.khuDivider}>
+                <View style={styles.khuDividerLine} />
+                <Text style={[styles.khuDividerLabel, { fontSize: adjustSize(11) }]}>{entry.label}</Text>
+                <View style={styles.khuDividerLine} />
+              </View>
+            );
+          }
+          const item = entry.data;
           const daysToExpiry = getDaysToExpiry(item.id);
           const isExpiringSoon = daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry < 30;
           const isOccupied = item.isOccupied;
@@ -316,7 +479,15 @@ export default function LandlordProperties() {
             : isOccupied ? local('occupied') : local('vacant');
 
           return (
-            <TouchableOpacity style={styles.card} onPress={() => setHistoryProperty(item)}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                router.push({
+                  pathname: '/(landlord)/room-detail',
+                  params: { propertyId: item.id }
+                })
+              }
+            >
               <View style={styles.iconContainer}>
                 <Text style={styles.iconText}>
                   {item.propertyType === 'House' ? '🏡' : '🏢'}
@@ -364,15 +535,59 @@ export default function LandlordProperties() {
               <Text style={[styles.modalTitle, { fontSize: adjustSize(17) }]}>
                 {historyProperty?.name}
               </Text>
-              {/* Edit property button */}
-              <TouchableOpacity onPress={() => {
-                setSelectedProperty(historyProperty);
-                setHistoryProperty(null);
-              }}>
-                <Text style={styles.modalSave}>✏️</Text>
-              </TouchableOpacity>
+              <View style={{ width: 50 }} />
             </View>
             <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+              {/* Room info */}
+              {historyProperty && (
+                <>
+                  <Text style={[styles.label, { fontSize: adjustSize(13), marginTop: 0 }]}>{local('room_info')}</Text>
+                  <View style={styles.detailContainer}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('belongs_to_complex')}</Text>
+                      <Text style={styles.detailValue}>
+                        {khuTros.find(k => k.id === historyProperty.khuTroId)?.name || local('dash_empty')}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('address_label')}</Text>
+                      <Text style={styles.detailValue}>{historyProperty.address}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('property_type_label')}</Text>
+                      <Text style={styles.detailValue}>{typeLabel(historyProperty.propertyType)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('bedrooms_label')}</Text>
+                      <Text style={styles.detailValue}>{historyProperty.bedrooms}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('bathrooms_label')}</Text>
+                      <Text style={styles.detailValue}>{historyProperty.bathrooms}</Text>
+                    </View>
+                    {historyProperty.remindDay !== undefined && (
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>{local('remind_day_label')}</Text>
+                        <Text style={styles.detailValue}>
+                          {localF('remind_day_value', { day: historyProperty.remindDay })}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('status_label')}</Text>
+                      <Text
+                        style={[
+                          styles.detailValue,
+                          { color: historyProperty.isOccupied ? '#34C759' : '#FF9500', fontWeight: '700' }
+                        ]}
+                      >
+                        {historyProperty.isOccupied ? local('occupied') : local('vacant')}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+
               {/* Quick stats */}
               {historyProperty && (() => {
                 const daysToExpiry = getDaysToExpiry(historyProperty.id);
@@ -429,9 +644,9 @@ export default function LandlordProperties() {
                       )}
                       <View style={[styles.khuListItem, { marginBottom: 8 }]}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[styles.khuListName, { fontSize: adjustSize(14) }]}>{p.notes || 'Tiền phòng'}</Text>
+                          <Text style={[styles.khuListName, { fontSize: adjustSize(14) }]}>{p.notes || local('base_rent')}</Text>
                           <Text style={[styles.khuListAddr, { fontSize: adjustSize(12) }]}>
-                            {tenant?.name || 'Không rõ'} • Hạn: {p.dueDate}
+                            {tenant?.name || local('unknown_tenant')} • {local('due_label')} {p.dueDate}
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -449,6 +664,246 @@ export default function LandlordProperties() {
                   );
                 });
               })()}
+
+              {/* Occupant */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('occupant_section')}</Text>
+              {historyProperty && (() => {
+                const occ = getActiveOccupant(historyProperty.id);
+                if (!occ) {
+                  return (
+                    <View style={styles.emptyLease}>
+                      <Text style={styles.emptyLeaseText}>{local('no_occupant')}</Text>
+                    </View>
+                  );
+                }
+                const { tenant } = occ;
+                return (
+                  <View style={styles.detailContainer}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                      {tenant.photoUri ? (
+                        <Image source={{ uri: tenant.photoUri }} style={styles.occupantAvatar} />
+                      ) : (
+                        <View style={[styles.occupantAvatar, styles.occupantAvatarFallback]}>
+                          <Text style={styles.occupantAvatarInitial}>{tenant.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <Text style={{ fontSize: adjustSize(16), fontWeight: '700', color: '#1C1C1E' }}>{tenant.name}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('phone_number')}</Text>
+                      <Text style={styles.detailValue}>{tenant.phone}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('zalo_number')}</Text>
+                      <Text style={styles.detailValue}>{tenant.zalo || local('dash_empty')}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{local('email_label')}</Text>
+                      <Text style={styles.detailValue}>{tenant.email || local('dash_empty')}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Lease History */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('lease_history')}</Text>
+              {historyProperty && (() => {
+                const hist = getLeaseHistory(historyProperty.id);
+                if (hist.length === 0) {
+                  return (
+                    <View style={styles.emptyLease}>
+                      <Text style={styles.emptyLeaseText}>{local('no_leases_for_room')}</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View style={styles.leaseContainer}>
+                    {hist.map(lease => (
+                      <View key={lease.id} style={styles.leaseRow}>
+                        <Text style={styles.leaseTenant}>{lease.tenantName}</Text>
+                        <Text style={styles.leaseDates}>{lease.startDate} — {lease.endDate}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+
+              {/* Price details */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('price_details')}</Text>
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>{local('base_rent_label')}</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={editRent}
+                  onChangeText={setEditRent}
+                />
+              </View>
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>{local('electricity_rate_label')}</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={editElectric}
+                  onChangeText={setEditElectric}
+                />
+              </View>
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>{local('water_rate_optional')}</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={editWater}
+                  onChangeText={setEditWater}
+                  placeholder={local('dash_empty')}
+                />
+              </View>
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>{local('service_fee_optional')}</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={editService}
+                  onChangeText={setEditService}
+                  placeholder={local('dash_empty')}
+                />
+              </View>
+              <View style={styles.inputBoxRow}>
+                <Text style={styles.rowLabel}>{local('parking_fee_optional')}</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  keyboardType="numeric"
+                  value={editParking}
+                  onChangeText={setEditParking}
+                  placeholder={local('dash_empty')}
+                />
+              </View>
+
+              {editCustomFees.map(fee => (
+                <View key={fee.id} style={styles.inputBoxRow}>
+                  <Text style={styles.rowLabel} numberOfLines={1}>{fee.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Text style={styles.numberInput}>{formatVND(fee.amount)}</Text>
+                    <TouchableOpacity onPress={() => handleRemoveCustomFee(fee.id)} hitSlop={8}>
+                      <Text style={{ color: '#FF3B30', fontWeight: '700', fontSize: 16 }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 8 }}>
+                <View style={[styles.inputBox, { flex: 1.4, marginBottom: 0 }]}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={local('custom_fee_name')}
+                    placeholderTextColor="#8E8E93"
+                    value={newFeeName}
+                    onChangeText={setNewFeeName}
+                  />
+                </View>
+                <View style={[styles.inputBox, { flex: 1, marginBottom: 0 }]}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={local('custom_fee_amount')}
+                    placeholderTextColor="#8E8E93"
+                    keyboardType="numeric"
+                    value={newFeeAmount}
+                    onChangeText={setNewFeeAmount}
+                  />
+                </View>
+                <TouchableOpacity style={styles.addFeeBtn} onPress={handleAddCustomFee}>
+                  <Text style={styles.addFeeBtnText}>＋</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 11, color: '#8E8E93', marginBottom: 12 }}>{local('add_custom_fee')}</Text>
+
+              <TouchableOpacity style={styles.addKhuSubmitBtn} onPress={handleSavePrices}>
+                <Text style={styles.addKhuSubmitText}>{local('save_prices')}</Text>
+              </TouchableOpacity>
+
+              {/* Contract */}
+              <Text style={[styles.label, { fontSize: adjustSize(13) }]}>{local('rental_agreement')}</Text>
+              {historyProperty && (() => {
+                const occ = getActiveOccupant(historyProperty.id);
+                if (!occ) {
+                  return (
+                    <View style={styles.emptyLease}>
+                      <Text style={styles.emptyLeaseText}>{local('no_occupant')}</Text>
+                    </View>
+                  );
+                }
+                const photos = getLeaseContractPhotos(occ.lease);
+                return (
+                  <View>
+                    {photos.length === 0 ? (
+                      <View style={styles.emptyLease}>
+                        <Text style={styles.emptyLeaseText}>{local('no_contract_photo')}</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <ScrollView
+                          horizontal
+                          pagingEnabled
+                          showsHorizontalScrollIndicator={false}
+                          onMomentumScrollEnd={handleContractScrollEnd}
+                          style={styles.contractPager}
+                        >
+                          {photos.map((uri, idx) => (
+                            <Image
+                              key={`contract-${idx}`}
+                              source={{ uri }}
+                              style={styles.contractPhoto}
+                              resizeMode="cover"
+                            />
+                          ))}
+                        </ScrollView>
+                        <Text style={styles.contractPageText}>
+                          {localF('contract_page_indicator', { current: contractPageIndex + 1, total: photos.length })}
+                        </Text>
+                      </>
+                    )}
+                    {occ.lease.contractUpdatedAt && (
+                      <Text style={styles.contractUpdatedText}>
+                        {localF('contract_last_updated', {
+                          date: new Date(occ.lease.contractUpdatedAt).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')
+                        })}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.addKhuSubmitBtn, { marginTop: 12 }]}
+                      onPress={() => handleUpdateContractPhotos(occ.lease)}
+                    >
+                      <Text style={styles.addKhuSubmitText}>{local('update_contract_photos')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
+
+              {/* Actions */}
+              {historyProperty && !historyProperty.isOccupied && (
+                <TouchableOpacity
+                  style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12, marginTop: 32 }]}
+                  onPress={() => {
+                    const propId = historyProperty.id;
+                    setHistoryProperty(null);
+                    router.push({
+                      pathname: '/(landlord)/create-lease',
+                      params: { propertyId: propId }
+                    });
+                  }}
+                >
+                  <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>{local('assign_tenant_action')}</Text>
+                </TouchableOpacity>
+              )}
+
+              {historyProperty && (
+                <TouchableOpacity
+                  style={[styles.deleteBtn, historyProperty.isOccupied && { marginTop: 32 }]}
+                  onPress={() => handleDelete(historyProperty.id)}
+                >
+                  <Text style={styles.deleteBtnText}>{local('delete_property_action')}</Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -499,7 +954,7 @@ export default function LandlordProperties() {
               <View style={styles.inputBox}>
                 <TextInput
                   style={[styles.textInput, { fontSize: adjustSize(15) }]}
-                  placeholder="Ngày nhắc phí khu trọ (1-28, optional)"
+                  placeholder={local('remind_day_khu_optional_label')}
                   placeholderTextColor="#8E8E93"
                   value={newKhuRemindDay}
                   onChangeText={setNewKhuRemindDay}
@@ -528,7 +983,7 @@ export default function LandlordProperties() {
                         <Text style={styles.khuListAddr}>{k.address}</Text>
                         {k.remindDay !== undefined && (
                           <Text style={[styles.khuListAddr, { color: '#007AFF', fontWeight: '600', marginTop: 2 }]}>
-                            📅 Ngày nhắc: Ngày {k.remindDay} hàng tháng
+                            📅 {local('remind_day_label')}: {localF('remind_day_value', { day: k.remindDay })}
                           </Text>
                         )}
                       </View>
@@ -616,12 +1071,12 @@ export default function LandlordProperties() {
                 )}
               </View>
 
-              <Text style={styles.label}>General Information</Text>
+              <Text style={styles.label}>{local('general_information')}</Text>
               
               <View style={styles.inputBox}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Property Name (e.g. Oakridge Apt 4B)"
+                  placeholder={local('property_name_placeholder')}
                   placeholderTextColor="#8E8E93"
                   value={name}
                   onChangeText={setName}
@@ -631,7 +1086,7 @@ export default function LandlordProperties() {
               <View style={styles.inputBox}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Address"
+                  placeholder={local('address_placeholder')}
                   placeholderTextColor="#8E8E93"
                   value={address}
                   onChangeText={setAddress}
@@ -639,7 +1094,7 @@ export default function LandlordProperties() {
               </View>
 
               {/* Picker for Property Type */}
-              <Text style={styles.label}>Property Type</Text>
+              <Text style={styles.label}>{local('property_type_label')}</Text>
               <View style={styles.segmentedContainer}>
                 {types.map(t => (
                   <TouchableOpacity
@@ -656,16 +1111,16 @@ export default function LandlordProperties() {
                         propertyType === t && { color: '#FFF', fontWeight: '700' }
                       ]}
                     >
-                      {t}
+                      {typeLabel(t)}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.label}>Financials & Size</Text>
+              <Text style={styles.label}>{local('financials_size_label')}</Text>
               
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Monthly Rent ($)</Text>
+                <Text style={styles.rowLabel}>{local('monthly_rent_room_label')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
@@ -675,7 +1130,7 @@ export default function LandlordProperties() {
               </View>
 
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Electricity (kWh)</Text>
+                <Text style={styles.rowLabel}>{local('electricity_kwh_label')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
@@ -685,7 +1140,7 @@ export default function LandlordProperties() {
               </View>
 
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Water (Monthly)</Text>
+                <Text style={styles.rowLabel}>{local('water_monthly_label')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
@@ -695,7 +1150,7 @@ export default function LandlordProperties() {
               </View>
 
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Service Fee</Text>
+                <Text style={styles.rowLabel}>{local('service_fee_room_label')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
@@ -705,7 +1160,7 @@ export default function LandlordProperties() {
               </View>
 
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>Remind Day (1-28, optional)</Text>
+                <Text style={styles.rowLabel}>{local('remind_day_optional_label')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
@@ -717,7 +1172,7 @@ export default function LandlordProperties() {
 
               {/* Bedroom Stepper */}
               <View style={styles.stepperRow}>
-                <Text style={styles.rowLabel}>Bedrooms: {bedrooms}</Text>
+                <Text style={styles.rowLabel}>{localF('bedrooms_count_label', { count: bedrooms })}</Text>
                 <View style={styles.stepperButtons}>
                   <TouchableOpacity
                     style={styles.stepperBtn}
@@ -736,7 +1191,7 @@ export default function LandlordProperties() {
 
               {/* Bathroom Stepper */}
               <View style={styles.stepperRow}>
-                <Text style={styles.rowLabel}>Bathrooms: {bathrooms}</Text>
+                <Text style={styles.rowLabel}>{localF('bathrooms_count_label', { count: bathrooms })}</Text>
                 <View style={styles.stepperButtons}>
                   <TouchableOpacity
                     style={styles.stepperBtn}
@@ -755,122 +1210,6 @@ export default function LandlordProperties() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
-
-      {/* Property Detail Modal */}
-      <Modal 
-        visible={selectedProperty !== null} 
-        animationType="slide" 
-        transparent
-        onRequestClose={() => setSelectedProperty(null)}
-      >
-        {selectedProperty && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={() => setSelectedProperty(null)}>
-                  <Text style={styles.modalCancel}>Close</Text>
-                </TouchableOpacity>
-                <Text style={styles.modalTitle}>{selectedProperty.name}</Text>
-                <View style={{ width: 50 }} />
-              </View>
-
-              <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 40 }}>
-                <Text style={styles.label}>Details</Text>
-                <View style={styles.detailContainer}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Address</Text>
-                    <Text style={styles.detailValue}>{selectedProperty.address}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Type</Text>
-                    <Text style={styles.detailValue}>{selectedProperty.propertyType}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Rent</Text>
-                    <Text style={styles.detailValue}>${selectedProperty.rentAmount.toLocaleString()}/mo</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Bedrooms</Text>
-                    <Text style={styles.detailValue}>{selectedProperty.bedrooms}</Text>
-                  </View>
-                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Bathrooms</Text>
-                    <Text style={styles.detailValue}>{selectedProperty.bathrooms}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Electricity Rate</Text>
-                    <Text style={styles.detailValue}>${selectedProperty.electricityRate?.toLocaleString() || '3,500'}/kWh</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Water Rate</Text>
-                    <Text style={styles.detailValue}>${selectedProperty.waterRate?.toLocaleString() || '100,000'}/mo</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Service Fee</Text>
-                    <Text style={styles.detailValue}>${selectedProperty.serviceFee?.toLocaleString() || '50,000'}/mo</Text>
-                  </View>
-                  {selectedProperty.remindDay !== undefined && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Remind Day</Text>
-                      <Text style={styles.detailValue}>Day {selectedProperty.remindDay} of month</Text>
-                    </View>
-                  )}
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Status</Text>
-                    <Text
-                      style={[
-                        styles.detailValue,
-                        { color: selectedProperty.isOccupied ? '#34C759' : '#FF9500', fontWeight: '700' }
-                      ]}
-                    >
-                      {selectedProperty.isOccupied ? 'Occupied' : 'Vacant'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Lease History */}
-                <Text style={styles.label}>Lease History</Text>
-                {getLeaseHistory(selectedProperty.id).length === 0 ? (
-                  <View style={styles.emptyLease}>
-                    <Text style={styles.emptyLeaseText}>No lease logs for this property.</Text>
-                  </View>
-                ) : (
-                  <View style={styles.leaseContainer}>
-                    {getLeaseHistory(selectedProperty.id).map(lease => (
-                      <View key={lease.id} style={styles.leaseRow}>
-                        <Text style={styles.leaseTenant}>{lease.tenantName}</Text>
-                        <Text style={styles.leaseDates}>{lease.startDate} to {lease.endDate}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {!selectedProperty.isOccupied && (
-                  <TouchableOpacity
-                    style={[styles.deleteBtn, { backgroundColor: '#007AFF1A', marginBottom: 12 }]}
-                    onPress={() => {
-                      setSelectedProperty(null);
-                      router.replace({
-                        pathname: '/(landlord)/payments',
-                        params: { openNewLease: 'true', propertyId: selectedProperty.id }
-                      });
-                    }}
-                  >
-                    <Text style={[styles.deleteBtnText, { color: '#007AFF' }]}>👤 Assign Tenant / Create Lease</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => handleDelete(selectedProperty.id)}
-                >
-                  <Text style={styles.deleteBtnText}>Delete Property</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        )}
       </Modal>
 
       {toastMessage !== null && (
@@ -925,6 +1264,22 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     gap: 12
+  },
+  khuDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4
+  },
+  khuDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#C7C7CC'
+  },
+  khuDividerLabel: {
+    color: '#8E8E93',
+    fontWeight: '800',
+    textTransform: 'uppercase'
   },
   emptyView: {
     flex: 1,
@@ -1193,17 +1548,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12
   },
-  khuManageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F2F2F7',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  khuManageText: {
-    fontSize: 16
-  },
   addBtnHeader: {
     width: 36,
     height: 36,
@@ -1384,5 +1728,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '700'
+  },
+  // Occupant avatar
+  occupantAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28
+  },
+  occupantAvatarFallback: {
+    backgroundColor: '#007AFF1A',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  occupantAvatarInitial: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#007AFF'
+  },
+  // Custom fee add row
+  addFeeBtn: {
+    width: 44,
+    height: 48,
+    backgroundColor: '#007AFF1A',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  addFeeBtnText: {
+    fontSize: 20,
+    color: '#007AFF',
+    fontWeight: '700'
+  },
+  // Contract pager
+  contractPager: {
+    height: 220,
+    borderRadius: 16
+  },
+  contractPhoto: {
+    width: CONTRACT_PAGE_WIDTH,
+    height: 220,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7'
+  },
+  contractPageText: {
+    textAlign: 'center',
+    marginTop: 8,
+    color: '#8E8E93',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  contractUpdatedText: {
+    color: '#8E8E93',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center'
   }
 });

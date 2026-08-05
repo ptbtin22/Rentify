@@ -16,6 +16,26 @@ export interface KhuTro {
   remindDay?: number;
 }
 
+export interface LandlordProfile {
+  name: string;
+  phone: string;
+  zalo: string;
+  email: string;
+}
+
+export interface CustomFee {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+const landlordProfile: LandlordProfile = {
+  name: 'Huỳnh Gia Âu',
+  phone: '0987012345',
+  zalo: '0935245059',
+  email: 'huynhgiaau@gmail.com',
+};
+
 export interface Property {
   id: string;
   khuTroId: string; // Parent building complex
@@ -30,6 +50,8 @@ export interface Property {
   waterRate: number;       // e.g. flat rate or per m3
   serviceFee: number;      // e.g. flat monthly parking/maintenance fee
   remindDay?: number;
+  parkingFee?: number;
+  customFees?: CustomFee[];
 }
 
 export interface AppConfig {
@@ -55,6 +77,8 @@ export interface Tenant {
   phone: string;
   notes?: string;
   password?: string; // Stored password (initially temp)
+  photoUri?: string;
+  zalo?: string;
 }
 
 export interface Lease {
@@ -68,6 +92,14 @@ export interface Lease {
   status: LeaseStatus;
   tenantPhoto?: string;   // Image URI reference
   contractPhoto?: string; // Image URI reference
+  contractPhotos?: string[];
+  contractUpdatedAt?: string;
+}
+
+export function getLeaseContractPhotos(lease: Lease): string[] {
+  if (lease.contractPhotos && lease.contractPhotos.length > 0) return lease.contractPhotos;
+  if (lease.contractPhoto) return [lease.contractPhoto];
+  return [];
 }
 
 export interface Payment {
@@ -82,8 +114,8 @@ export interface Payment {
 
 // Initial Mock Data with full breakdown configurations
 let khuTros: KhuTro[] = [
-  { id: 'khu-1', name: 'Oakridge Apartment', address: '456 Greenway Blvd' },
-  { id: 'khu-2', name: 'Greenway House', address: '128 Pinecrest Ave' }
+  { id: 'khu-1', name: 'Khu Trọ Đường Xanh', address: '456 Đường Xanh, Q.1, TP.HCM' },
+  { id: 'khu-2', name: 'Nhà Trọ Đường Thông', address: '128 Đường Thông, Q.3, TP.HCM' }
 ];
 
 let properties: Property[] = [
@@ -91,7 +123,7 @@ let properties: Property[] = [
     id: 'prop-1',
     khuTroId: 'khu-1',
     name: 'Phòng 202',
-    address: '456 Greenway Blvd, Room 202',
+    address: '456 Đường Xanh, Phòng 202, Q.1, TP.HCM',
     propertyType: 'Apartment',
     rentAmount: 3500000,
     bedrooms: 2,
@@ -99,13 +131,15 @@ let properties: Property[] = [
     isOccupied: true,
     electricityRate: 3500,      // VND per kWh
     waterRate: 100000,           // VND flat per month
-    serviceFee: 50000            // VND flat per month
+    serviceFee: 50000,           // VND flat per month
+    parkingFee: 150000,
+    customFees: [{ id: 'cf-seed-1', name: 'Internet', amount: 80000 }]
   },
   {
     id: 'prop-2',
     khuTroId: 'khu-2',
     name: 'Căn A',
-    address: '128 Pinecrest Ave',
+    address: '128 Đường Thông, Q.3, TP.HCM',
     propertyType: 'House',
     rentAmount: 6000000,
     bedrooms: 4,
@@ -119,7 +153,7 @@ let properties: Property[] = [
     id: 'prop-3',
     khuTroId: 'khu-1',
     name: 'Phòng 104',
-    address: '456 Greenway Blvd, Room 104',
+    address: '456 Đường Xanh, Phòng 104, Q.1, TP.HCM',
     propertyType: 'Apartment',
     rentAmount: 2800000,
     bedrooms: 1,
@@ -133,7 +167,7 @@ let properties: Property[] = [
     id: 'prop-4',
     khuTroId: 'khu-1',
     name: 'Phòng 105',
-    address: '456 Greenway Blvd, Room 105',
+    address: '456 Đường Xanh, Phòng 105, Q.1, TP.HCM',
     propertyType: 'Apartment',
     rentAmount: 3000000,
     bedrooms: 1,
@@ -147,7 +181,7 @@ let properties: Property[] = [
     id: 'prop-5',
     khuTroId: 'khu-1',
     name: 'Phòng 203',
-    address: '456 Greenway Blvd, Room 203',
+    address: '456 Đường Xanh, Phòng 203, Q.1, TP.HCM',
     propertyType: 'Apartment',
     rentAmount: 3200000,
     bedrooms: 1,
@@ -161,7 +195,7 @@ let properties: Property[] = [
     id: 'prop-6',
     khuTroId: 'khu-1',
     name: 'Phòng 205',
-    address: '456 Greenway Blvd, Room 205',
+    address: '456 Đường Xanh, Phòng 205, Q.1, TP.HCM',
     propertyType: 'Apartment',
     rentAmount: 3500000,
     bedrooms: 2,
@@ -176,37 +210,45 @@ let properties: Property[] = [
 let tenants: Tenant[] = [
   {
     id: 'tenant-1',
-    name: 'Jane Tenant',
-    email: 'jane@example.com',
-    phone: '901234567',
-    notes: 'Likes quiet hours.',
-    password: '123456'
+    name: 'Nguyễn Thị An',
+    email: 'nguyenthian@gmail.com',
+    phone: '0901234567',
+    zalo: '0901234567',
+    notes: 'Thích yên tĩnh.',
+    password: '123456',
+    photoUri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
   },
   {
     id: 'tenant-2',
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '987654321',
-    notes: 'Interested in house viewings.',
-    password: '123456'
+    name: 'Trần Văn Bình',
+    email: 'tranvanbinh@gmail.com',
+    phone: '0977654321',
+    zalo: '0977654321',
+    notes: 'Muốn xem nhà thêm.',
+    password: '123456',
+    photoUri: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150'
   },
   {
     id: 'tenant-3',
-    name: 'Alice Smith',
-    email: 'alice@example.com',
+    name: 'Lê Thị Chi',
+    email: 'lethichi@gmail.com',
     phone: '0912345678',
-    password: '123456'
+    zalo: '0912345678',
+    password: '123456',
+    photoUri: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150'
   },
   {
     id: 'tenant-4',
-    name: 'Bob Johnson',
-    email: 'bob@example.com',
+    name: 'Phạm Văn Dũng',
+    email: 'phamvandung@gmail.com',
     phone: '0987654321',
-    password: '123456'
+    zalo: '0987654321',
+    password: '123456',
+    photoUri: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'
   }
 ];
 
-// Mocking multiple active leases for Jane Tenant (tenant-1) to verify Room Switcher
+// Mocking multiple active leases for Nguyễn Thị An (tenant-1) to verify Room Switcher
 let leases: Lease[] = [
   {
     id: 'lease-1',
@@ -218,7 +260,13 @@ let leases: Lease[] = [
     securityDeposit: 3500000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+    contractPhoto: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
+    contractPhotos: [
+      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
+      'https://images.unsplash.com/photo-1554224154-26032ffc0d62?w=800',
+      'https://images.unsplash.com/photo-1586282391129-162a8e70c1d9?w=800',
+    ],
+    contractUpdatedAt: '2026-06-01T08:00:00.000Z',
   },
   {
     id: 'lease-2',
@@ -230,7 +278,12 @@ let leases: Lease[] = [
     securityDeposit: 2800000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+    contractPhoto: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
+    contractPhotos: [
+      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
+      'https://images.unsplash.com/photo-1554224154-26032ffc0d62?w=800',
+    ],
+    contractUpdatedAt: '2026-07-01T08:00:00.000Z',
   },
   {
     id: 'lease-3',
@@ -314,6 +367,24 @@ let payments: Payment[] = [
   }
 ];
 
+/** Deep-clone helper for test isolation (JSON-safe seed data only). */
+function cloneSeed<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/** Frozen snapshot of initial Vietnamese seed — test-only reset source. */
+const SEED_SNAPSHOT = {
+  landlordProfile: cloneSeed(landlordProfile),
+  appConfig: cloneSeed(appConfig),
+  khuTros: cloneSeed(khuTros),
+  properties: cloneSeed(properties),
+  tenants: cloneSeed(tenants),
+  leases: cloneSeed(leases),
+  payments: cloneSeed(payments),
+  activeTenantLeaseId: null as string | null,
+  fireSoundEnabled: true,
+};
+
 // Listeners for reactivity
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(l => l());
@@ -322,10 +393,24 @@ let activeTenantLeaseId: string | null = null;
 let fireSoundEnabled = true;
 
 export const Database = {
+  /** Test-only: restore in-memory state to initial VI seed. */
+  __resetForTests: () => {
+    Object.assign(landlordProfile, cloneSeed(SEED_SNAPSHOT.landlordProfile));
+    appConfig = cloneSeed(SEED_SNAPSHOT.appConfig);
+    khuTros = cloneSeed(SEED_SNAPSHOT.khuTros);
+    properties = cloneSeed(SEED_SNAPSHOT.properties);
+    tenants = cloneSeed(SEED_SNAPSHOT.tenants);
+    leases = cloneSeed(SEED_SNAPSHOT.leases);
+    payments = cloneSeed(SEED_SNAPSHOT.payments);
+    activeTenantLeaseId = SEED_SNAPSHOT.activeTenantLeaseId;
+    fireSoundEnabled = SEED_SNAPSHOT.fireSoundEnabled;
+  },
+
   getProperties: () => properties,
   getTenants: () => tenants,
   getLeases: () => leases,
   getPayments: () => payments,
+  getLandlordProfile: () => landlordProfile,
   getAppConfig: () => appConfig,
   updateAppConfig: (newConfig: Partial<AppConfig>) => {
     appConfig = { ...appConfig, ...newConfig };
@@ -370,6 +455,11 @@ export const Database = {
     notify();
   },
 
+  updateProperty: (id: string, partial: Partial<Omit<Property, 'id'>>) => {
+    properties = properties.map(p => (p.id === id ? { ...p, ...partial } : p));
+    notify();
+  },
+
   // Tenant Actions
   addTenant: (tenant: Omit<Tenant, 'id'>) => {
     const newTenant: Tenant = {
@@ -379,6 +469,11 @@ export const Database = {
     tenants.push(newTenant);
     notify();
     return newTenant;
+  },
+
+  updateTenant: (id: string, partial: Partial<Omit<Tenant, 'id'>>) => {
+    tenants = tenants.map(t => (t.id === id ? { ...t, ...partial } : t));
+    notify();
   },
 
   updateTenantPassword: (id: string, newPass: string) => {
@@ -395,8 +490,16 @@ export const Database = {
 
   // Lease Actions
   createLease: (lease: Omit<Lease, 'id' | 'status'>) => {
+    const contractPhotos =
+      lease.contractPhotos && lease.contractPhotos.length > 0
+        ? lease.contractPhotos
+        : lease.contractPhoto
+          ? [lease.contractPhoto]
+          : [];
     const newLease: Lease = {
       ...lease,
+      contractPhotos,
+      contractPhoto: contractPhotos[0],
       id: 'lease-' + Math.random().toString(36).substring(7),
       status: 'active'
     };
@@ -433,6 +536,20 @@ export const Database = {
     }
     leases = leases.filter(l => l.id !== id);
     payments = payments.filter(p => p.leaseId !== id);
+    notify();
+  },
+
+  updateLeaseContractPhotos: (leaseId: string, uris: string[]) => {
+    leases = leases.map(l =>
+      l.id === leaseId
+        ? {
+            ...l,
+            contractPhotos: uris,
+            contractPhoto: uris[0],
+            contractUpdatedAt: new Date().toISOString(),
+          }
+        : l
+    );
     notify();
   },
 

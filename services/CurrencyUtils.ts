@@ -14,6 +14,22 @@ export const formatVND = (amount: number): string => {
 };
 
 /**
+ * Group digits for money text inputs: "60000000" → "60,000,000".
+ * Non-digit characters are dropped so it is safe to feed raw keyboard input in.
+ */
+export const formatAmountInput = (value: string | number): string => {
+  const digits = String(value).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (!digits) return '';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+/** Inverse of formatAmountInput: "60,000,000" → 60000000 ("" → 0). */
+export const parseAmountInput = (value: string): number => {
+  const digits = String(value).replace(/\D/g, '');
+  return digits ? Number(digits) : 0;
+};
+
+/**
  * Short format for metric cards: 3.500.000 → "3,5tr ₫"
  */
 export const formatVNDShort = (amount: number): string => {

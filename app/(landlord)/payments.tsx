@@ -5,7 +5,7 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,50 +13,23 @@ import {
   FlatList,
   TouchableOpacity,
   Modal,
-  TextInput,
   Alert,
   ScrollView,
-  Keyboard,
-  KeyboardEvent,
-  LayoutAnimation,
-  UIManager,
-  Platform,
-  Animated,
-  Vibration,
-  ActionSheetIOS,
   Linking
 } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Database, Property, Tenant, Lease, Payment } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { formatVND } from '../../services/CurrencyUtils';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
- 
-// Helper: format Date → "YYYY-MM-DD" string for storage
-const formatDate = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
- 
-// Helper: format Date → "Aug 1, 2026" readable label
-const formatLabel = (date: Date): string =>
-  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
- 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
+import { excludeFuturePayments } from '../../services/paymentUtils';
  
 export default function LandlordPayments() {
   const { local, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
+  const router = useRouter();
   const [isConfigVisible, setIsConfigVisible] = useState(false);
   const params = useLocalSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -70,179 +43,18 @@ export default function LandlordPayments() {
   // Tenant payment history modal
   const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
 
-  // Modal visibility
-  const [isAddLeaseVisible, setIsAddLeaseVisible] = useState(false);
-
-  // Auto-open modal if query parameter set
+  // Legacy deep-link → full-screen create-lease
   useEffect(() => {
     if (params.openNewLease === 'true') {
-      setIsAddLeaseVisible(true);
-      if (params.propertyId) {
-        setSelectedPropertyId(params.propertyId as string);
-      }
-      if (params.tenantId) {
-        setSelectedTenantId(params.tenantId as string);
-      }
+      router.replace({
+        pathname: '/(landlord)/create-lease',
+        params: {
+          ...(params.propertyId ? { propertyId: String(params.propertyId) } : {}),
+          ...(params.tenantId ? { tenantId: String(params.tenantId) } : {})
+        }
+      });
     }
   }, [params.openNewLease, params.propertyId, params.tenantId]);
-
-  // Form state — dates stored as Date objects
-  const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [selectedTenantId, setSelectedTenantId] = useState('');
-  const [startDate, setStartDate] = useState(new Date('2026-08-01'));
-  const [endDate, setEndDate] = useState(new Date('2027-07-31'));
-  const [monthlyRent, setMonthlyRent] = useState('');
-  const [securityDeposit, setSecurityDeposit] = useState('');
-
-  // Camera states
-  const [tenantPhoto, setTenantPhoto] = useState<string | undefined>(undefined);
-  const [contractPhoto, setContractPhoto] = useState<string | undefined>(undefined);
-
-  const handleAttachmentSelection = async (mode: 'tenant' | 'contract') => {
-    const launchCamera = async () => {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera access is needed to capture photos.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: mode === 'tenant' ? [1, 1] : [4, 3],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
-        if (mode === 'tenant') setTenantPhoto(uri);
-        else setContractPhoto(uri);
-        Vibration.vibrate(100);
-      }
-    };
-
-    const launchLibrary = async () => {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Photo library access is needed.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: mode === 'tenant' ? [1, 1] : [4, 3],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
-        if (mode === 'tenant') setTenantPhoto(uri);
-        else setContractPhoto(uri);
-        Vibration.vibrate(100);
-      }
-    };
-
-    const launchFilePicker = async () => {
-      try {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: ['image/*', 'application/pdf'],
-          copyToCacheDirectory: true
-        });
-        if (!result.canceled && result.assets.length > 0) {
-          const uri = result.assets[0].uri;
-          if (mode === 'tenant') setTenantPhoto(uri);
-          else setContractPhoto(uri);
-          Vibration.vibrate(100);
-        }
-      } catch (err) {
-        console.log('Document pick error: ', err);
-      }
-    };
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Take Photo', 'Choose from Photo Library', 'Browse Files'],
-          cancelButtonIndex: 0
-        },
-        (buttonIndex: number) => {
-          if (buttonIndex === 1) launchCamera();
-          else if (buttonIndex === 2) launchLibrary();
-          else if (buttonIndex === 3) launchFilePicker();
-        }
-      );
-    } else {
-      Alert.alert(
-        'Select Attachment Source',
-        'Choose how you want to upload the document:',
-        [
-          { text: 'Take Photo', onPress: launchCamera },
-          { text: 'Photo Library', onPress: launchLibrary },
-          { text: 'Browse Files', onPress: launchFilePicker },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-    }
-  };
-
-  // Each picker needs two independent booleans:
-  //   isMounted — controls whether the DateTimePicker is in the tree at all
-  //   isOpen    — drives the animation value (0 = closed, 1 = open)
-  // Opening:  mount first, then animate open.
-  // Closing:  animate to 0 first, unmount only inside the spring callback.
-  // This prevents the layout snap that occurs when the picker is removed from
-  // the tree before the height animation has fully settled at 0.
-
-  const [startMounted, setStartMounted] = useState(false);
-  const [endMounted,   setEndMounted]   = useState(false);
-  const startPickerAnim = useRef(new Animated.Value(0)).current;
-  const endPickerAnim   = useRef(new Animated.Value(0)).current;
-
-  const PICKER_HEIGHT = 180;
-
-  const openPicker  = (anim: Animated.Value) => {
-    Animated.spring(anim, { toValue: 1, useNativeDriver: false, tension: 60, friction: 10 }).start();
-  };
-  const closePicker = (anim: Animated.Value, unmount: () => void) => {
-    Animated.spring(anim, { toValue: 0, useNativeDriver: false, tension: 60, friction: 10 }).start(({ finished }) => {
-      if (finished) unmount();
-    });
-  };
-
-  const toggleStartPicker = () => {
-    if (!startMounted) {
-      // Close end picker first if open
-      if (endMounted) closePicker(endPickerAnim, () => setEndMounted(false));
-      setStartMounted(true);
-      // Give React a frame to mount before animating
-      requestAnimationFrame(() => openPicker(startPickerAnim));
-    } else {
-      closePicker(startPickerAnim, () => setStartMounted(false));
-    }
-  };
-
-  const toggleEndPicker = () => {
-    if (!endMounted) {
-      if (startMounted) closePicker(startPickerAnim, () => setStartMounted(false));
-      setEndMounted(true);
-      requestAnimationFrame(() => openPicker(endPickerAnim));
-    } else {
-      closePicker(endPickerAnim, () => setEndMounted(false));
-    }
-  };
-
-  // Exact keyboard height — updated by native keyboard events
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const formScrollRef = useRef<ScrollView>(null);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0)
-    );
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   const refreshData = () => {
     setPayments([...Database.getPayments()]);
@@ -256,65 +68,6 @@ export default function LandlordPayments() {
     refreshData();
     return unsubscribe;
   }, []);
-
-  // Auto-fill rent from property
-  useEffect(() => {
-    if (selectedPropertyId) {
-      const prop = properties.find(p => p.id === selectedPropertyId);
-      if (prop) {
-        setMonthlyRent(prop.rentAmount.toString());
-        setSecurityDeposit(prop.rentAmount.toString());
-      }
-    }
-  }, [selectedPropertyId]);
-
-  const closeAndroidPicker = (picker: 'start' | 'end') => {
-    if (Platform.OS !== 'android') return;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    if (picker === 'start') setStartMounted(false);
-    else setEndMounted(false);
-  };
-
-  const onDateValueChange = (picker: 'start' | 'end') =>
-    (_event: DateTimePickerEvent, selected?: Date) => {
-      if (selected) {
-        if (picker === 'start') setStartDate(selected);
-        else setEndDate(selected);
-      }
-      closeAndroidPicker(picker);
-    };
-
-  const onDateDismiss = (picker: 'start' | 'end') => () => {
-    closeAndroidPicker(picker);
-  };
-
-  const handleCreateLease = () => {
-    if (!selectedPropertyId || !selectedTenantId) return;
-
-    Database.createLease({
-      propertyId: selectedPropertyId,
-      tenantId: selectedTenantId,
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-      monthlyRent: Number(monthlyRent),
-      securityDeposit: Number(securityDeposit),
-      tenantPhoto,
-      contractPhoto
-    });
-
-    // Reset form
-    setSelectedPropertyId('');
-    setSelectedTenantId('');
-    setStartDate(new Date('2026-08-01'));
-    setEndDate(new Date('2027-07-31'));
-    setMonthlyRent('');
-    setSecurityDeposit('');
-    setTenantPhoto(undefined);
-    setContractPhoto(undefined);
-    closeAllPickers();
-    setIsAddLeaseVisible(false);
-    Alert.alert('Lease Agreement Saved', 'Lease has been activated. Invoices were generated.');
-  };
 
   const handleSendManualReminder = (pay: Payment) => {
     const info = getPaymentDisplayData(pay);
@@ -341,11 +94,6 @@ export default function LandlordPayments() {
     );
   };
 
-  const closeAllPickers = () => {
-    closePicker(startPickerAnim, () => setStartMounted(false));
-    closePicker(endPickerAnim,   () => setEndMounted(false));
-  };
-
   const handleRecordPaid = (id: string) => {
     Alert.alert(
       local('record_paid_title'),
@@ -362,8 +110,9 @@ export default function LandlordPayments() {
     const prop = lease ? properties.find(p => p.id === lease.propertyId) : null;
     const tenant = lease ? tenants.find(t => t.id === lease.tenantId) : null;
     return {
+      propertyId: prop ? prop.id : undefined,
       propertyName: prop ? prop.name : 'Unknown Property',
-      tenantName: tenant ? tenant.name : 'Unknown Tenant',
+      tenantName: tenant ? tenant.name : local('unknown_tenant'),
       tenantPhone: tenant ? tenant.phone : undefined,
       tenantId: tenant ? tenant.id : undefined,
       dueDate: pay.dueDate,
@@ -372,10 +121,10 @@ export default function LandlordPayments() {
     };
   };
 
-  // Sorted newest-first, filtered by status
-  const filteredPayments = payments
-    .filter(p => selectedStatusFilter === 'All' || p.status === selectedStatusFilter)
-    .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+  // Sorted newest-first, filtered by status; upcoming dues stay hidden
+  const filteredPayments = excludeFuturePayments(
+    payments.filter(p => selectedStatusFilter === 'All' || p.status === selectedStatusFilter)
+  ).sort((a, b) => b.dueDate.localeCompare(a.dueDate));
 
   // Build list items with month dividers injected
   type ListItem = { type: 'payment'; data: Payment } | { type: 'divider'; label: string };
@@ -403,8 +152,7 @@ export default function LandlordPayments() {
   // All payments for a given tenant (for history modal)
   const getTenantPaymentHistory = (tenantId: string) => {
     const tenantLeaseIds = leases.filter(l => l.tenantId === tenantId).map(l => l.id);
-    return payments
-      .filter(p => tenantLeaseIds.includes(p.leaseId))
+    return excludeFuturePayments(payments.filter(p => tenantLeaseIds.includes(p.leaseId)))
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   };
 
@@ -412,19 +160,19 @@ export default function LandlordPayments() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('payments_leases')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: adjustSize(20) }]}>{local('landlord_tab_payments')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.configActionBtn}
             onPress={() => setIsConfigVisible(true)}
-            accessibilityLabel="Billing Configuration"
+            accessibilityLabel={local('billing_config')}
           >
             <Text style={[styles.configActionText, { fontSize: adjustSize(16) }]}>⚙️</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addBtnHeader}
-            onPress={() => setIsAddLeaseVisible(true)}
-            accessibilityLabel="New Lease"
+            onPress={() => router.push('/(landlord)/create-lease')}
+            accessibilityLabel={local('new_lease_title')}
           >
             <Text style={[styles.addText, { fontSize: adjustSize(16) }]}>➕</Text>
           </TouchableOpacity>
@@ -478,7 +226,14 @@ export default function LandlordPayments() {
           return (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => info.tenantId ? setHistoryTenantId(info.tenantId) : null}
+              onPress={() => {
+                if (info.propertyId) {
+                  router.push({
+                    pathname: '/(landlord)/room-detail',
+                    params: { propertyId: info.propertyId, initialTab: 'payments' }
+                  });
+                }
+              }}
               activeOpacity={0.85}
             >
               <View style={styles.details}>
@@ -585,186 +340,6 @@ export default function LandlordPayments() {
               })()}
             </ScrollView>
           </View>
-        </View>
-      </Modal>
-
-      {/* ─── New Lease Modal ─── */}
-      <Modal visible={isAddLeaseVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => { closeAllPickers(); setIsAddLeaseVisible(false); }}>
-                <Text style={styles.modalCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>New Lease</Text>
-              <TouchableOpacity
-                onPress={handleCreateLease}
-                disabled={!selectedPropertyId || !selectedTenantId}
-                style={(!selectedPropertyId || !selectedTenantId) && { opacity: 0.4 }}
-              >
-                <Text style={styles.modalSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Form — ScrollView with exact keyboard padding */}
-              <ScrollView
-                ref={formScrollRef}
-                style={styles.formScroll}
-                contentContainerStyle={{ paddingBottom: keyboardHeight + 32 }}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {/* ── Property & Tenant ── */}
-                <Text style={styles.label}>Property & Tenant</Text>
-
-                <View style={styles.pickerBox}>
-                  <Text style={styles.pickerTitle}>Select Property:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
-                    {properties.map(p => (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={[styles.selectItem, selectedPropertyId === p.id && styles.selectItemActive]}
-                        onPress={() => setSelectedPropertyId(p.id)}
-                      >
-                        <Text style={[styles.selectText, selectedPropertyId === p.id && styles.selectTextActive]}>
-                          {p.name} ({p.isOccupied ? 'Occupied' : 'Vacant'})
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                <View style={styles.pickerBox}>
-                  <Text style={styles.pickerTitle}>Select Tenant:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionRow}>
-                    {tenants.map(t => (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={[styles.selectItem, selectedTenantId === t.id && styles.selectItemActive]}
-                        onPress={() => setSelectedTenantId(t.id)}
-                      >
-                        <Text style={[styles.selectText, selectedTenantId === t.id && styles.selectTextActive]}>
-                          {t.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                {/* ── Lease Terms ── */}
-                <Text style={styles.label}>Lease Terms</Text>
-
-                {/* Start Date row */}
-                <TouchableOpacity
-                  style={styles.inputBoxRow}
-                  onPress={toggleStartPicker}
-                >
-                  <Text style={styles.rowLabel}>Start Date</Text>
-                  <View style={styles.dateValueRow}>
-                    <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
-                    <Text style={[styles.dateChevron, startMounted && styles.dateChevronOpen]}>›</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Start picker — always mounted, height driven by LayoutAnimation */}
-                <View style={[styles.pickerWrapper, { height: startMounted ? PICKER_HEIGHT : 0 }]}>
-                  <DateTimePicker
-                    value={startDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onValueChange={onDateValueChange('start')}
-                    onDismiss={onDateDismiss('start')}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-
-                {/* End Date row */}
-                <TouchableOpacity
-                  style={styles.inputBoxRow}
-                  onPress={toggleEndPicker}
-                >
-                  <Text style={styles.rowLabel}>End Date</Text>
-                  <View style={styles.dateValueRow}>
-                    <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
-                    <Text style={[styles.dateChevron, endMounted && styles.dateChevronOpen]}>›</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* End picker — always mounted, height driven by LayoutAnimation */}
-                <View style={[styles.pickerWrapper, { height: endMounted ? PICKER_HEIGHT : 0 }]}>
-                  <DateTimePicker
-                    value={endDate}
-                    mode="date"
-                    minimumDate={startDate}
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onValueChange={onDateValueChange('end')}
-                    onDismiss={onDateDismiss('end')}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-
-                {/* Monthly Rent */}
-                <View style={styles.inputBoxRow}>
-                  <Text style={styles.rowLabel}>Monthly Rent ($)</Text>
-                  <TextInput
-                    style={styles.textInputRight}
-                    keyboardType="numeric"
-                    value={monthlyRent}
-                    onChangeText={setMonthlyRent}
-                    returnKeyType="next"
-                  />
-                </View>
-
-                {/* Security Deposit */}
-                <View style={styles.inputBoxRow}>
-                  <Text style={styles.rowLabel}>Security Deposit ($)</Text>
-                  <TextInput
-                    style={styles.textInputRight}
-                    keyboardType="numeric"
-                    value={securityDeposit}
-                    onChangeText={setSecurityDeposit}
-                    returnKeyType="done"
-                  />
-                </View>
-
-                {/* ── Tenant & Contract Photos ── */}
-                <Text style={styles.label}>Attachments & Photos</Text>
-                
-                <View style={styles.photoRow}>
-                  <View style={styles.photoInfo}>
-                    <Text style={styles.rowLabel}>Tenant Photo</Text>
-                    <Text style={[styles.photoStatus, { color: tenantPhoto ? '#34C759' : '#FF3B30' }]}>
-                      {tenantPhoto ? 'Uploaded' : 'Missing'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.photoCaptureBtn}
-                    onPress={() => handleAttachmentSelection('tenant')}
-                  >
-                    <Text style={styles.photoCaptureText}>Upload</Text>
-                  </TouchableOpacity>
-                </View>
- 
-                <View style={styles.photoRow}>
-                  <View style={styles.photoInfo}>
-                    <Text style={styles.rowLabel}>Signed Contract</Text>
-                    <Text style={[styles.photoStatus, { color: contractPhoto ? '#34C759' : '#FF3B30' }]}>
-                      {contractPhoto ? 'Uploaded' : 'Missing'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.photoCaptureBtn}
-                    onPress={() => handleAttachmentSelection('contract')}
-                  >
-                    <Text style={styles.photoCaptureText}>Upload</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Bottom spacer — already handled by paddingBottom on contentContainerStyle */}
-              </ScrollView>
-          </View>
-
         </View>
       </Modal>
 

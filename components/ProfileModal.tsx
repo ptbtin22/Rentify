@@ -11,15 +11,18 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View as RNView, Platform } from 'react-native';
-import { useAuth } from '../services/AuthManager';
+import { useAuth, AuthManager } from '../services/AuthManager';
 import { useLanguage } from '../services/LanguageManager';
 import { useEasyViewMode } from '../services/EasyViewManager';
 import { NoticeRepository, Notice } from '../services/NoticeRepository';
 import { PostDetailModal } from './PostDetailModal';
+import { createInviteCode, getActiveInvite } from '../services/TenantInviteCode';
+import * as Clipboard from 'expo-clipboard';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -30,22 +33,28 @@ interface ProfileModalProps {
     phone: string;
     role: string;
     email?: string;
+    zalo?: string;
   };
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, onPostClick, user }) => {
   const { currentRole } = useAuth();
-  const { local, language } = useLanguage();
+  const { local, localF, language } = useLanguage();
   const { adjustSize } = useEasyViewMode();
   const [myNotices, setMyNotices] = useState<Notice[]>([]);
   const insets = useSafeAreaInsets();
   const [selectedPost, setSelectedPost] = useState<Notice | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<number>(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
   // Mock profile details matching the roles or passed user
   const profileName = user ? user.name : (currentRole === 'landlord' ? local('landlord_name') : local('tenant_name'));
   const profilePhone = user ? user.phone : (currentRole === 'landlord' ? '0901234567' : '0909888777');
   const profileEmail = user?.email || (currentRole === 'landlord' ? 'landlord@rentify.vn' : 'jane.tenant@rentify.vn');
   const profileSub = user ? user.role : (currentRole === 'landlord' ? local('landlord_role') : local('tenant_role'));
+  // A `user` prop means we are looking at somebody else's profile
+  const isOwnProfile = !user;
 
   const getInitials = (name: string) => {
     const parts = name.split(' ');
@@ -70,6 +79,45 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
       return unsubscribe;
     }
   }, [visible, currentRole]);
+
+  useEffect(() => {
+    if (!visible || currentRole !== 'tenant' || !isOwnProfile) return;
+    const tenantId = AuthManager.getLoggedInTenantId();
+    if (!tenantId) return;
+    const existing = getActiveInvite(tenantId);
+    if (existing) {
+      setInviteCode(existing.code);
+      setInviteExpiresAt(existing.expiresAt);
+    }
+  }, [visible, currentRole, isOwnProfile]);
+
+  useEffect(() => {
+    if (!inviteExpiresAt) {
+      setSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((inviteExpiresAt - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left <= 0) setInviteCode(null);
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [inviteExpiresAt]);
+
+  const handleGetCode = () => {
+    const tenantId = AuthManager.getLoggedInTenantId() || 'tenant-1';
+    const invite = createInviteCode(tenantId);
+    setInviteCode(invite.code);
+    setInviteExpiresAt(invite.expiresAt);
+  };
+
+  const handleCopyCode = async () => {
+    if (!inviteCode) return;
+    await Clipboard.setStringAsync(inviteCode);
+    Alert.alert(local('code_copied'));
+  };
 
   return (
     <Modal
@@ -101,9 +149,43 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
               <Text style={[styles.profileName, { fontSize: adjustSize(18) }]}>{profileName}</Text>
               <Text style={[styles.profileSub, { fontSize: adjustSize(12) }]}>{profileSub}</Text>
               <Text style={[styles.profileDetails, { fontSize: adjustSize(12) }]}>📞 {profilePhone}</Text>
+              {user?.zalo ? (
+                <Text style={[styles.profileDetails, { fontSize: adjustSize(12) }]}>
+                  💬 {local('zalo_number')}: {user.zalo}
+                </Text>
+              ) : null}
               <Text style={[styles.profileDetails, { fontSize: adjustSize(12) }]}>✉️ {profileEmail}</Text>
             </View>
           </View>
+
+          {/* The invite code is personal: never expose it on another tenant's profile */}
+          {currentRole === 'tenant' && isOwnProfile && (
+            <View style={styles.inviteCard}>
+              <Text style={[styles.sectionLabel, { fontSize: adjustSize(11), marginTop: 0 }]}>
+                {local('tenant_code_label').toUpperCase()}
+              </Text>
+              {inviteCode && secondsLeft > 0 ? (
+                <>
+                  <Text style={styles.inviteCodeText}>{inviteCode}</Text>
+                  <Text style={styles.inviteExpiry}>
+                    {localF('tenant_code_expires_in', { seconds: secondsLeft })}
+                  </Text>
+                  <TouchableOpacity style={styles.inviteBtn} onPress={handleCopyCode}>
+                    <Text style={styles.inviteBtnText}>{local('copy_code')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {inviteExpiresAt > 0 && secondsLeft <= 0 && (
+                    <Text style={styles.inviteExpiry}>{local('tenant_code_expired')}</Text>
+                  )}
+                  <TouchableOpacity style={styles.inviteBtn} onPress={handleGetCode}>
+                    <Text style={styles.inviteBtnText}>{local('get_tenant_code')}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
 
           {/* Section 2: Post History */}
           <Text style={[styles.sectionLabel, { fontSize: adjustSize(11) }]}>
@@ -189,6 +271,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginBottom: 20
+  },
+  inviteCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center'
+  },
+  inviteCodeText: {
+    fontSize: 40,
+    fontWeight: '900',
+    letterSpacing: 8,
+    color: '#007AFF',
+    marginVertical: 8
+  },
+  inviteExpiry: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontWeight: '600',
+    marginBottom: 10
+  },
+  inviteBtn: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignSelf: 'stretch',
+    alignItems: 'center'
+  },
+  inviteBtnText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 14
   },
   avatar: {
     width: 72,

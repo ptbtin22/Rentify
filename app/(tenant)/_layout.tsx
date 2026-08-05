@@ -35,20 +35,20 @@ export default function TenantLayout() {
         }}
       />
       <Tabs.Screen
-        name="notices"
-        options={{
-          title: local('bulletin') || 'Bulletin',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
-          )
-        }}
-      />
-      <Tabs.Screen
         name="community"
         options={{
           title: local('community_tab') || 'Community',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
+          )
+        }}
+      />
+      <Tabs.Screen
+        name="notices"
+        options={{
+          title: local('bulletin') || 'Bulletin',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications" size={size} color={color} />
           )
         }}
       />

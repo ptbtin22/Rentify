@@ -26,7 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, AuthManager } from '../../services/AuthManager';
-import { Database, Property, Lease, Payment } from '../../services/Database';
+import { Database, Property, Lease, Payment, getLeaseContractPhotos } from '../../services/Database';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { ProfileModal } from '../../components/ProfileModal';
@@ -35,11 +35,17 @@ import { PostDetailModal } from '../../components/PostDetailModal';
 import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import { formatVND } from '../../services/CurrencyUtils';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
+import {
+  calcConsumptionKwh,
+  formatMeterReading,
+  METER_DIGITS,
+  MOCK_PREVIOUS_METER_KWH,
+  MOCK_OCR_CURRENT_KWH,
+  MOCK_METER_PHOTO_URI
+} from '../../services/meterUtils';
  
 export default function TenantPortal() {
-  const { local, language } = useLanguage();
+  const { local, localF, language } = useLanguage();
   const router = useRouter();
   const { logout } = useAuth();
  
@@ -50,6 +56,10 @@ export default function TenantPortal() {
    
   // Track currently selected lease context
   const [isContractVisible, setIsContractVisible] = useState(false);
+  const [contractPage, setContractPage] = useState(0);
+  const [contractPagerWidth, setContractPagerWidth] = useState(0);
+  const [isContactModalVisible, setIsContactModalVisible] = useState(false);
+  const [isRoomInfoVisible, setIsRoomInfoVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
@@ -61,10 +71,15 @@ export default function TenantPortal() {
   const [isMeterModalVisible, setIsMeterModalVisible] = useState(false);
   const [meterReadingStep, setMeterReadingStep] = useState<'scan' | 'breakdown' | 'qr'>('scan');
   const [meterKwh, setMeterKwh] = useState('');
+  const [meterManualConfirmed, setMeterManualConfirmed] = useState(false);
   const [isScanningLoader, setIsScanningLoader] = useState(false);
   const [currentPaymentForBilling, setCurrentPaymentForBilling] = useState<Payment | null>(null);
   
   const [waitingForPaymentReturn, setWaitingForPaymentReturn] = useState(false);
+
+  const meterConsumption = calcConsumptionKwh(MOCK_PREVIOUS_METER_KWH, Number(meterKwh || 0));
+  const meterIsDirty = meterKwh !== '' && Number(meterKwh) !== MOCK_OCR_CURRENT_KWH;
+  const electricityAmount = meterConsumption * (property?.electricityRate ?? 3500);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -72,7 +87,7 @@ export default function TenantPortal() {
         setWaitingForPaymentReturn(false);
         const finalAmount =
           (activeLease?.monthlyRent ?? 0) +
-          (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+          electricityAmount +
           (property?.waterRate ?? 0) +
           (property?.serviceFee ?? 0);
 
@@ -108,6 +123,17 @@ export default function TenantPortal() {
     }
   };
 
+  const handleCaptureMeter = () => {
+    setIsScanningLoader(true);
+    setTimeout(() => {
+      setIsScanningLoader(false);
+      setMeterKwh(formatMeterReading(MOCK_OCR_CURRENT_KWH));
+      setMeterManualConfirmed(false);
+      setMeterReadingStep('breakdown');
+      Vibration.vibrate(100);
+    }, 1500);
+  };
+
   const getPendingBill = () => {
     return tenantPayments.find(p => p.status === 'Pending') || null;
   };
@@ -134,7 +160,9 @@ export default function TenantPortal() {
       const prop = properties.find(p => p.id === lease.propertyId) || null;
       setProperty(prop);
 
-      const payList = payments.filter(p => p.leaseId === lease.id);
+      const payList = payments
+        .filter(p => p.leaseId === lease.id)
+        .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
       setTenantPayments(payList);
     } else {
       setProperty(null);
@@ -162,9 +190,9 @@ export default function TenantPortal() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Cancel', ...options],
+          options: [local('cancel'), ...options],
           cancelButtonIndex: 0,
-          title: 'Switch Active Rental Unit'
+          title: local('switch_active_rental_unit_title')
         },
         (buttonIndex) => {
           if (buttonIndex > 0) {
@@ -175,8 +203,8 @@ export default function TenantPortal() {
       );
     } else {
       Alert.alert(
-        'Switch Active Room',
-        'Choose a room context:',
+        local('switch_active_room_title'),
+        local('choose_room_context_desc'),
         options.map((name, idx) => ({
           text: name,
           onPress: () => Database.setActiveTenantLeaseId(tenantLeases[idx].id)
@@ -185,6 +213,14 @@ export default function TenantPortal() {
       );
     }
   };
+
+  const landlord = Database.getLandlordProfile();
+  const contractPhotos = activeLease ? getLeaseContractPhotos(activeLease) : [];
+  const khu = property ? Database.getKhuTros().find(k => k.id === property.khuTroId) : null;
+
+  useEffect(() => {
+    setContractPage(0);
+  }, [isContractVisible, activeLease?.id]);
 
   const getStatusColor = (status: string) => {
     if (status === 'Paid') return '#34C759'; // Green
@@ -197,7 +233,7 @@ export default function TenantPortal() {
       {/* Top Header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>Welcome Back 👋</Text>
+          <Text style={[styles.welcomeText, { fontSize: adjustSize(12) }]}>{local('welcome_back')}</Text>
           {(() => {
             const currentTenant = Database.getTenants().find(t => t.id === AuthManager.getLoggedInTenantId());
             const tenantName = currentTenant ? currentTenant.name : 'Resident';
@@ -223,7 +259,7 @@ export default function TenantPortal() {
           <TouchableOpacity 
             style={[styles.profileHeaderBtn, { backgroundColor: '#FF3B301A', borderColor: '#FF3B3033' }]}
             onPress={() => setIsFireConfirmVisible(true)}
-            accessibilityLabel="Emergency Fire Alert"
+            accessibilityLabel={local('emergency_fire_alert')}
           >
             <Text style={{ fontSize: 18 }}>🚨</Text>
           </TouchableOpacity>
@@ -258,7 +294,7 @@ export default function TenantPortal() {
               setIsProfileVisible(true);
             }}
           >
-            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 View Profile</Text>
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>👤 {local('view_profile')}</Text>
           </TouchableOpacity>
           <View style={styles.dropdownDivider} />
           <TouchableOpacity 
@@ -268,7 +304,7 @@ export default function TenantPortal() {
               setIsSettingsVisible(true);
             }}
           >
-            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ Settings</Text>
+            <Text style={[styles.dropdownItemText, { fontSize: adjustSize(13) }]}>⚙️ {local('settings')}</Text>
           </TouchableOpacity>
           <View style={styles.dropdownDivider} />
           <TouchableOpacity 
@@ -279,7 +315,7 @@ export default function TenantPortal() {
               router.replace('/login');
             }}
           >
-            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 Logout</Text>
+            <Text style={[styles.dropdownItemText, { color: '#FF3B30', fontSize: adjustSize(13) }]}>🚪 {local('logout')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -290,10 +326,10 @@ export default function TenantPortal() {
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderTitleRow}>
               <Text style={[styles.cardHeaderIcon, { fontSize: adjustSize(16) }]}>📄</Text>
-              <Text style={[styles.cardHeaderTitle, { fontSize: adjustSize(14) }]}>Active Lease Agreement</Text>
+              <Text style={[styles.cardHeaderTitle, { fontSize: adjustSize(14) }]}>{local('active_lease_title')}</Text>
             </View>
             <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>ACTIVE</Text>
+              <Text style={styles.activeBadgeText}>{local('active_badge')}</Text>
             </View>
           </View>
 
@@ -396,27 +432,26 @@ export default function TenantPortal() {
           <View style={styles.quickLinksRow}>
             {/* View contract */}
             <TouchableOpacity style={styles.linkCard} onPress={() => setIsContractVisible(true)}>
-              <Text style={[styles.linkIcon, { fontSize: adjustSize(28) }]}>📄</Text>
-              <Text style={[styles.linkLabel, { fontSize: adjustSize(13) }]}>{local('view_lease')}</Text>
+              <Text style={[styles.linkIcon, { fontSize: adjustSize(24) }]}>📄</Text>
+              <Text style={[styles.linkLabel, { fontSize: adjustSize(12) }]} numberOfLines={2}>{local('view_lease')}</Text>
             </TouchableOpacity>
 
             {/* Contact Landlord */}
             <TouchableOpacity
               style={styles.linkCard}
-              onPress={() => {
-                Alert.alert(
-                  local('contact_landlord'),
-                  '0901234567',
-                  [
-                    { text: local('cancel'), style: 'cancel' },
-                    { text: 'Zalo', onPress: () => Linking.openURL('https://zalo.me/0901234567') },
-                    { text: language === 'vi' ? 'Gọi điện' : 'Call', onPress: () => Linking.openURL('tel:0901234567').catch(() => Alert.alert(local('error') || 'Error', 'Phone calls are not supported on this simulator.')) }
-                  ]
-                );
-              }}
+              onPress={() => setIsContactModalVisible(true)}
             >
-              <Text style={[styles.linkIcon, { fontSize: adjustSize(28) }]}>💬</Text>
-              <Text style={[styles.linkLabel, { fontSize: adjustSize(13) }]}>{local('contact_landlord')}</Text>
+              <Text style={[styles.linkIcon, { fontSize: adjustSize(24) }]}>💬</Text>
+              <Text style={[styles.linkLabel, { fontSize: adjustSize(12) }]} numberOfLines={2}>{local('contact_landlord')}</Text>
+            </TouchableOpacity>
+
+            {/* Room Info */}
+            <TouchableOpacity
+              style={styles.linkCard}
+              onPress={() => setIsRoomInfoVisible(true)}
+            >
+              <Text style={[styles.linkIcon, { fontSize: adjustSize(24) }]}>🏠</Text>
+              <Text style={[styles.linkLabel, { fontSize: adjustSize(12) }]} numberOfLines={2}>{local('room_info')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -457,7 +492,7 @@ export default function TenantPortal() {
             {/* Header */}
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setIsMeterModalVisible(false)}>
-                <Text style={styles.modalCancel}>Close</Text>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>
                 {meterReadingStep === 'scan' && local('snap_electricity_meter')}
@@ -491,89 +526,9 @@ export default function TenantPortal() {
                       {/* Shutter Button -> Trigger Mock Scan Directly */}
                       <TouchableOpacity
                         style={styles.shutterButton}
-                        onPress={() => {
-                          setIsScanningLoader(true);
-                          setTimeout(() => {
-                            setIsScanningLoader(false);
-                            setMeterKwh('248');
-                            setMeterReadingStep('breakdown');
-                            Vibration.vibrate(100);
-                          }, 1500);
-                        }}
+                        onPress={handleCaptureMeter}
                       >
                         <View style={styles.shutterInner} />
-                      </TouchableOpacity>
-
-                      {/* Gallery Button */}
-                      <TouchableOpacity
-                        style={[styles.secondaryScanBtn, { position: 'absolute', right: 30 }]}
-                        onPress={async () => {
-                          const launchLibrary = async () => {
-                            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                            if (status !== 'granted') {
-                              Alert.alert('Permission Required', 'Photo library access is needed.');
-                              return;
-                            }
-                            const result = await ImagePicker.launchImageLibraryAsync({
-                              mediaTypes: ['images'],
-                              quality: 0.8,
-                            });
-                            if (!result.canceled && result.assets.length > 0) {
-                              setIsScanningLoader(true);
-                              setTimeout(() => {
-                                setIsScanningLoader(false);
-                                setMeterKwh('248');
-                                setMeterReadingStep('breakdown');
-                                Vibration.vibrate(100);
-                              }, 1500);
-                            }
-                          };
-
-                          const launchFilePicker = async () => {
-                            try {
-                              const result = await DocumentPicker.getDocumentAsync({
-                                type: ['image/*', 'application/pdf'],
-                                copyToCacheDirectory: true
-                              });
-                              if (!result.canceled && result.assets.length > 0) {
-                                setIsScanningLoader(true);
-                                setTimeout(() => {
-                                  setIsScanningLoader(false);
-                                  setMeterKwh('248');
-                                  setMeterReadingStep('breakdown');
-                                  Vibration.vibrate(100);
-                                }, 1500);
-                              }
-                            } catch (err) {
-                              console.log('File picker error: ', err);
-                            }
-                          };
-
-                          if (Platform.OS === 'ios') {
-                            ActionSheetIOS.showActionSheetWithOptions(
-                              {
-                                options: ['Cancel', 'Photo Library', 'Browse Files'],
-                                cancelButtonIndex: 0
-                              },
-                              (buttonIndex) => {
-                                if (buttonIndex === 1) launchLibrary();
-                                else if (buttonIndex === 2) launchFilePicker();
-                              }
-                            );
-                          } else {
-                            Alert.alert(
-                              'Select Meter Photo Source',
-                              'Choose how you want to upload the meter photo:',
-                              [
-                                { text: 'Photo Library', onPress: launchLibrary },
-                                { text: 'Browse Files', onPress: launchFilePicker },
-                                { text: 'Cancel', style: 'cancel' }
-                              ]
-                            );
-                          }
-                        }}
-                      >
-                        <Text style={styles.secondaryScanText}>Gallery</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -583,22 +538,71 @@ export default function TenantPortal() {
 
             {/* Step 2: Bill Breakdown Screen */}
             {meterReadingStep === 'breakdown' && (
-              <ScrollView style={styles.modalScroll}>
+              <View style={{ flex: 1 }}>
+              <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 8 }}>
+                <Text style={styles.sectionLabel}>{local('meter_photo_label')}</Text>
+                <Image
+                  source={{ uri: MOCK_METER_PHOTO_URI }}
+                  style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 12 }}
+                  resizeMode="cover"
+                />
+
                 <Text style={styles.sectionLabel}>{local('meter_reading_section')}</Text>
                 <View style={styles.inputCard}>
-                  <Text style={styles.inputLabel}>{local('consumption_kwh')}</Text>
+                  <Text style={styles.inputLabel}>{local('meter_prev_reading')}</Text>
+                  <Text style={[styles.textInput, { color: '#8E8E93' }]}>
+                    {formatMeterReading(MOCK_PREVIOUS_METER_KWH)}
+                  </Text>
+                </View>
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputLabel}>{local('meter_curr_reading')}</Text>
                   <TextInput
                     style={styles.textInput}
                     keyboardType="numeric"
+                    maxLength={METER_DIGITS}
                     value={meterKwh}
-                    onChangeText={setMeterKwh}
+                    onChangeText={(v) => {
+                      setMeterKwh(v.replace(/\D/g, '').slice(0, METER_DIGITS));
+                      setMeterManualConfirmed(false);
+                    }}
+                    onBlur={() => {
+                      if (meterKwh) setMeterKwh(formatMeterReading(meterKwh));
+                    }}
                     placeholder={local('enter_meter_kwh')}
                     placeholderTextColor="#8E8E93"
                   />
                 </View>
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputLabel}>{local('meter_consumption')}</Text>
+                  <Text style={[styles.textInput, { color: '#8E8E93' }]}>{meterConsumption}</Text>
+                </View>
                 <Text style={styles.inputHelperText}>
-                  * Chỉ số được trích xuất bằng camera OCR. Bạn có thể tự chỉnh sửa tay nếu nhận diện sai.
+                  {local('ocr_helper_text')}
                 </Text>
+                {meterIsDirty && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, paddingHorizontal: 4 }}
+                    onPress={() => setMeterManualConfirmed(v => !v)}
+                  >
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 6,
+                        borderWidth: 2,
+                        borderColor: '#007AFF',
+                        backgroundColor: meterManualConfirmed ? '#007AFF' : '#FFF',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {meterManualConfirmed ? <Text style={{ color: '#FFF', fontWeight: '900' }}>✓</Text> : null}
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#1C1C1E', fontWeight: '600' }}>
+                      {local('meter_manual_confirm')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 <Text style={styles.sectionLabel}>{local('monthly_bill_details')}</Text>
                 <View style={styles.breakdownCard}>
@@ -609,17 +613,15 @@ export default function TenantPortal() {
                     </Text>
                   </View>
 
-                  {/* Electricity: kWh × rate (both in VND) */}
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>
-                      {language === 'vi' ? 'Tiền điện' : 'Electricity'} ({Number(meterKwh || 0)} kWh × {formatVND(property?.electricityRate ?? 3500)}/kWh)
+                      {language === 'vi' ? 'Tiền điện' : 'Electricity'} ({meterConsumption} kWh × {formatVND(property?.electricityRate ?? 3500)}/kWh)
                     </Text>
                     <Text style={styles.breakdownValue}>
-                      {formatVND(Number(meterKwh || 0) * (property?.electricityRate ?? 3500))}
+                      {formatVND(electricityAmount)}
                     </Text>
                   </View>
 
-                  {/* Water flat rate in VND */}
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>{local('water_bill')}</Text>
                     <Text style={styles.breakdownValue}>
@@ -627,7 +629,6 @@ export default function TenantPortal() {
                     </Text>
                   </View>
 
-                  {/* Service flat rate in VND */}
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>{local('services_bill')}</Text>
                     <Text style={styles.breakdownValue}>
@@ -642,7 +643,7 @@ export default function TenantPortal() {
                     <Text style={styles.breakdownValueTotal}>
                       {formatVND(
                         (activeLease?.monthlyRent ?? 0) +
-                        (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+                        electricityAmount +
                         (property?.waterRate ?? 0) +
                         (property?.serviceFee ?? 0)
                       )}
@@ -650,13 +651,24 @@ export default function TenantPortal() {
                   </View>
                 </View>
 
+              </ScrollView>
+
+              {/* Pinned so the pay action stays reachable without scrolling */}
+              <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={styles.payNowBtn}
-                  onPress={() => setMeterReadingStep('qr')}
+                  onPress={() => {
+                    if (meterIsDirty && !meterManualConfirmed) {
+                      Alert.alert(local('please_confirm_manual_meter'));
+                      return;
+                    }
+                    setMeterReadingStep('qr');
+                  }}
                 >
                   <Text style={styles.payNowBtnText}>{local('proceed_to_pay')}</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
+              </View>
             )}
 
             {/* Step 3: VietQR Code display */}
@@ -688,7 +700,7 @@ export default function TenantPortal() {
                     <Text style={styles.qrAmountValue}>
                       {formatVND(
                         (activeLease?.monthlyRent ?? 0) +
-                        (Number(meterKwh || 0) * (property?.electricityRate ?? 3500)) +
+                        electricityAmount +
                         (property?.waterRate ?? 0) +
                         (property?.serviceFee ?? 0)
                       )}
@@ -700,11 +712,11 @@ export default function TenantPortal() {
                 <View style={styles.transferDetailCard}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{local('account_holder')}</Text>
-                    <Text style={styles.detailValue}>NGUYEN VAN CHU NHA</Text>
+                    <Text style={styles.detailValue}>{landlord.name.toUpperCase()}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{local('account_number')}</Text>
-                    <Text style={styles.detailValue}>0901234567</Text>
+                    <Text style={styles.detailValue}>{landlord.phone}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>{local('transfer_message')}</Text>
@@ -715,7 +727,7 @@ export default function TenantPortal() {
                 </View>
 
                 {/* Bank app deep-link buttons */}
-                <Text style={{ fontSize: 13, color: '#8E8E93', marginTop: 16, marginBottom: 8, textAlign: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#8E8E93', marginTop: 0, marginBottom: 8, textAlign: 'center' }}>
                   {local('open_bank_app')}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 12 }}>
@@ -786,35 +798,46 @@ export default function TenantPortal() {
               <View style={{ width: 50 }} />
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={{ alignItems: 'center' }}>
-              <Text style={styles.contractLabel}>{local('rental_agreement')}</Text>
-              <View style={styles.documentMock}>
-                <Text style={styles.docHeader}>{local('rental_agreement').toUpperCase()}</Text>
-                <Text style={styles.docBody}>
-                  {language === 'vi'
-                    ? `Hợp đồng này được ký giữa Chủ Nhà và Cư dân cho phòng:`
-                    : 'This Lease Agreement is entered into between Landlord and Resident for rental unit:'}
-                  {'\n\n'}{property ? property.name : 'Phòng'}
-                  {'\n\n'}{language === 'vi' ? 'Điều khoản:' : 'Terms:'}
-                  {'\n'}- {local('monthly_rent')}: {activeLease ? formatVND(activeLease.monthlyRent) : formatVND(3500000)}
-                  {'\n'}- {local('security_deposit')}: {activeLease ? formatVND(activeLease.securityDeposit) : formatVND(3500000)}
-                  {'\n'}- {local('lease_duration')}: {activeLease ? `${activeLease.startDate} – ${activeLease.endDate}` : '2026-08-01 – 2027-07-31'}
-                  {'\n\n'}{language === 'vi' ? 'Được ký và niêm phong bởi Rentify Security.' : 'Signed & Sealed under Rentify Security.'}
-                </Text>
-                <View style={styles.docSignatures}>
-                  <Text style={styles.signatureText}>{language === 'vi' ? 'Chủ nhà: [Đã ký]' : 'Landlord: [Signed]'}</Text>
-                  <Text style={styles.signatureText}>{language === 'vi' ? 'Người thuê: [Đã ký]' : 'Tenant: [Signed]'}</Text>
-                </View>
-              </View>
-
-              {/* Contract photo */}
-              {activeLease?.contractPhoto ? (
-                <View style={{ width: '100%', marginTop: 16 }}>
-                  <Text style={[styles.contractLabel, { marginBottom: 8 }]}>{local('contract_photo_label')}</Text>
-                  <Image
-                    source={{ uri: activeLease.contractPhoto }}
-                    style={{ width: '100%', height: 220, borderRadius: 12, resizeMode: 'cover' }}
-                  />
+            <ScrollView style={styles.modalScroll} contentContainerStyle={{ alignItems: 'center', paddingBottom: 24 }}>
+              {contractPhotos.length > 0 ? (
+                <View
+                  style={{ width: '100%', marginTop: 8 }}
+                  onLayout={(e) => setContractPagerWidth(e.nativeEvent.layout.width)}
+                >
+                  {contractPagerWidth > 0 && (
+                    <ScrollView
+                      horizontal
+                      pagingEnabled
+                      showsHorizontalScrollIndicator={false}
+                      onMomentumScrollEnd={(e) => {
+                        const idx = Math.round(e.nativeEvent.contentOffset.x / contractPagerWidth);
+                        setContractPage(idx);
+                      }}
+                      style={{ width: contractPagerWidth, height: 420, borderRadius: 12 }}
+                    >
+                      {contractPhotos.map((uri, idx) => (
+                        <Image
+                          key={idx}
+                          source={{ uri }}
+                          resizeMode="contain"
+                          style={{ width: contractPagerWidth, height: 420, borderRadius: 12, backgroundColor: '#F2F2F7' }}
+                        />
+                      ))}
+                    </ScrollView>
+                  )}
+                  {contractPhotos.length > 1 && (
+                    <View style={styles.pageIndicatorRow}>
+                      {contractPhotos.map((_, idx) => (
+                        <View
+                          key={idx}
+                          style={[styles.pageDot, idx === contractPage && styles.pageDotActive]}
+                        />
+                      ))}
+                      <Text style={styles.pageIndicatorText}>
+                        {localF('contract_page_indicator', { current: contractPage + 1, total: contractPhotos.length })}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               ) : (
                 <Text style={{ color: '#8E8E93', fontSize: 13, marginTop: 12 }}>{local('no_contract_photo')}</Text>
@@ -824,8 +847,135 @@ export default function TenantPortal() {
         </View>
       </Modal>
 
+      {/* ─── Contact Landlord Modal ─── */}
+      <Modal visible={isContactModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.contactModalContent}>
+            <Text style={styles.contactModalTitle}>{local('contact_landlord')}</Text>
 
-      
+            <View style={styles.contactInfoList}>
+              <View style={styles.contactInfoRow}>
+                <Text style={styles.contactInfoIcon}>👤</Text>
+                <Text style={styles.contactInfoValue}>{landlord.name}</Text>
+              </View>
+              <View style={styles.contactInfoRow}>
+                <Text style={styles.contactInfoIcon}>📞</Text>
+                <Text style={styles.contactInfoValue}>{landlord.phone}</Text>
+              </View>
+              <View style={styles.contactInfoRow}>
+                <Text style={styles.contactInfoIcon}>💬</Text>
+                <Text style={styles.contactInfoValue}>Zalo: {landlord.zalo}</Text>
+              </View>
+              <View style={styles.contactInfoRow}>
+                <Text style={styles.contactInfoIcon}>✉️</Text>
+                <Text style={styles.contactInfoValue}>{landlord.email}</Text>
+              </View>
+            </View>
+
+            <View style={styles.contactActionsRow}>
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => Linking.openURL(`tel:${landlord.phone}`).catch(() => {})}
+              >
+                <Text style={styles.contactActionIcon}>📞</Text>
+                <Text style={styles.contactActionText}>{local('call_action')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => Linking.openURL(`https://zalo.me/${landlord.zalo.replace(/\D/g, '')}`).catch(() => {})}
+              >
+                <Text style={styles.contactActionIcon}>💬</Text>
+                <Text style={styles.contactActionText}>{local('zalo_chat')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.contactActionBtn}
+                onPress={() => Linking.openURL(`mailto:${landlord.email}`).catch(() => {})}
+              >
+                <Text style={styles.contactActionIcon}>✉️</Text>
+                <Text style={styles.contactActionText}>{local('email_action')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.contactCloseBtn}
+              onPress={() => setIsContactModalVisible(false)}
+            >
+              <Text style={styles.contactCloseBtnText}>{local('close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Room Info Modal ─── */}
+      <Modal visible={isRoomInfoVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setIsRoomInfoVisible(false)}>
+                <Text style={styles.modalCancel}>{local('close')}</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{local('room_info')}</Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={styles.listCard}>
+                <View style={[styles.rowItem, { flexDirection: 'row', justifyContent: 'space-between' }]}>
+                  <Text style={styles.detailLabel}>{local('room_number')}</Text>
+                  <Text style={styles.detailValue}>{property ? property.name : '—'}</Text>
+                </View>
+                <View style={styles.rowDivider} />
+                <View style={[styles.rowItem, { flexDirection: 'row', justifyContent: 'space-between' }]}>
+                  <Text style={styles.detailLabel}>{local('belongs_to_complex')}</Text>
+                  <Text style={styles.detailValue}>{khu ? khu.name : '—'}</Text>
+                </View>
+                <View style={styles.rowDivider} />
+                <View style={[styles.rowItem, { flexDirection: 'row', justifyContent: 'space-between' }]}>
+                  <Text style={styles.detailLabel}>{local('contact_landlord')}</Text>
+                  <Text style={styles.detailValue}>{landlord.name}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.sectionLabel}>{local('price_details')}</Text>
+              <View style={styles.breakdownCard}>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>{local('monthly_rent')}</Text>
+                  <Text style={styles.breakdownValue}>{formatVND(property?.rentAmount ?? 0)}</Text>
+                </View>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>{local('electricity_rate_label')}</Text>
+                  <Text style={styles.breakdownValue}>{formatVND(property?.electricityRate ?? 0)}/kWh</Text>
+                </View>
+                {!!property?.waterRate && (
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('water_rate_optional')}</Text>
+                    <Text style={styles.breakdownValue}>{formatVND(property.waterRate)}</Text>
+                  </View>
+                )}
+                {!!property?.serviceFee && (
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('service_fee_optional')}</Text>
+                    <Text style={styles.breakdownValue}>{formatVND(property.serviceFee)}</Text>
+                  </View>
+                )}
+                {!!property?.parkingFee && (
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{local('parking_fee_optional')}</Text>
+                    <Text style={styles.breakdownValue}>{formatVND(property.parkingFee)}</Text>
+                  </View>
+                )}
+                {(property?.customFees ?? []).map(fee => (
+                  <View style={styles.breakdownRow} key={fee.id}>
+                    <Text style={styles.breakdownLabel}>{fee.name}</Text>
+                    <Text style={styles.breakdownValue}>{formatVND(fee.amount)}</Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <FireConfirmationModal
         visible={isFireConfirmVisible}
         onClose={() => setIsFireConfirmVisible(false)}
@@ -885,14 +1035,18 @@ const styles = StyleSheet.create({
   },
   quickLinksRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16
+    gap: 12
   },
   linkCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 96,
     backgroundColor: '#F2F2F7',
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -907,7 +1061,8 @@ const styles = StyleSheet.create({
   linkLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1C1C1E'
+    color: '#1C1C1E',
+    textAlign: 'center'
   },
   // Modal styles for document viewer
   modalOverlay: {
@@ -991,6 +1146,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#8E8E93',
     fontStyle: 'italic'
+  },
+  pageIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10
+  },
+  pageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D1D1D6'
+  },
+  pageDotActive: {
+    backgroundColor: '#007AFF',
+    width: 16
+  },
+  pageIndicatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginLeft: 6
   },
   // ─── Billing Action Banner ───
   billingBanner: {
@@ -1188,9 +1366,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
     borderRadius: 14,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 32,
-    marginBottom: 40
+    justifyContent: 'center'
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    backgroundColor: '#FFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA'
   },
   payNowBtnText: {
     color: '#FFF',
@@ -1294,7 +1478,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 8,
-    marginBottom: 30
+    marginBottom: 10
   },
   confirmPayBtn: {
     height: 52,
@@ -1532,17 +1716,77 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 18
   },
-  secondaryScanBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  // ─── Contact Landlord Modal ───
+  contactModalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 36
+  },
+  contactModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  contactInfoList: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+    marginBottom: 20
+  },
+  contactInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  contactInfoIcon: {
+    fontSize: 16,
+    width: 24,
+    textAlign: 'center'
+  },
+  contactInfoValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    flexShrink: 1
+  },
+  contactActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16
+  },
+  contactActionBtn: {
+    flex: 1,
+    backgroundColor: '#007AFF15',
+    borderWidth: 1,
+    borderColor: '#007AFF33',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 6
+  },
+  contactActionIcon: {
+    fontSize: 20
+  },
+  contactActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#007AFF'
+  },
+  contactCloseBtn: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
     justifyContent: 'center'
   },
-  secondaryScanText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700'
+  contactCloseBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E'
   }
 });
