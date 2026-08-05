@@ -23,7 +23,8 @@ import { useAuth } from '../../services/AuthManager';
 import { useLanguage } from '../../services/LanguageManager';
 import { Database } from '../../services/Database';
 import { useEasyViewMode } from '../../services/EasyViewManager';
-import { formatVND, formatVNDShort } from '../../services/CurrencyUtils';
+import { formatVND, formatVNDShort, formatAmountInput } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { NotificationManager } from '../../services/NotificationManager';
@@ -39,7 +40,8 @@ export default function LandlordDashboard() {
 
   // Metrics state
   const [metrics, setMetrics] = useState({
-    totalRevenue: 0,
+    monthlyRevenue: 0,
+    lifetimeRevenue: 0,
     unpaidBalance: 0,
     occupancyRate: 0,
     activeLeasesCount: 0
@@ -52,6 +54,7 @@ export default function LandlordDashboard() {
   const [selectedDetailPost, setSelectedDetailPost] = useState<Notice | null>(null);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [isFireConfirmVisible, setIsFireConfirmVisible] = useState(false);
+  const [amountsVisible, setAmountsVisible] = useState(false);
   const { adjustSize } = useEasyViewMode();
 
   // Calculate Metrics from Database
@@ -59,32 +62,31 @@ export default function LandlordDashboard() {
     const properties = Database.getProperties();
     const leases = Database.getLeases();
     const payments = Database.getPayments();
+    const now = new Date();
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // 1. Total Revenue (sum of all Paid payments)
-    const totalRev = payments
-      .filter(p => p.status === 'Paid')
+    const paid = payments.filter(p => p.status === 'Paid');
+    const lifetimeRevenue = paid.reduce((sum, p) => sum + p.amount, 0);
+    const monthlyRevenue = paid
+      .filter(p => p.dueDate.startsWith(monthPrefix))
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // 2. Unpaid Balance (sum of Pending / Overdue payments)
     const unpaidBal = payments
       .filter(p => p.status !== 'Paid')
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // 3. Occupancy Rate
     const occupiedCount = properties.filter(p => p.isOccupied).length;
     const occRate = properties.length > 0 ? (occupiedCount / properties.length) * 100 : 0;
-
-    // 4. Active Leases
     const activeCount = leases.filter(l => l.status === 'active').length;
 
     setMetrics({
-      totalRevenue: totalRev,
+      monthlyRevenue,
+      lifetimeRevenue,
       unpaidBalance: unpaidBal,
       occupancyRate: occRate,
       activeLeasesCount: activeCount
     });
 
-    // 5. Build recent payments with lease details
     const recent = payments
       .map(p => {
         const lease = leases.find(l => l.id === p.leaseId);
@@ -94,7 +96,7 @@ export default function LandlordDashboard() {
           propertyName: property ? property.name : 'Unknown Property'
         };
       })
-      .slice(0, 5); // Limit to top 5
+      .slice(0, 5);
     setRecentPayments(recent);
   };
 
@@ -208,34 +210,68 @@ export default function LandlordDashboard() {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Metrics Grid */}
-        <View style={styles.grid}>
-          {/* Card 1 */}
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>💰</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{formatVNDShort(metrics.totalRevenue)}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('monthly_revenue')}</Text>
+        {/* Metrics panel — money values hidden until eye is toggled */}
+        <View style={styles.metricsPanel}>
+          <View style={styles.metricsPanelHeader}>
+            <Text style={[styles.metricsPanelTitle, { fontSize: adjustSize(15) }]}>
+              {local('dashboard')}
+            </Text>
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setAmountsVisible(v => !v)}
+              accessibilityLabel={amountsVisible ? local('hide_amounts') : local('show_amounts')}
+              hitSlop={10}
+            >
+              <Text style={{ fontSize: adjustSize(18) }}>{amountsVisible ? '👁️' : '🙈'}</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Card 2 */}
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>⚠️</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{formatVNDShort(metrics.unpaidBalance)}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('unpaid_balance')}</Text>
-          </View>
+          <View style={styles.grid}>
+            <View style={styles.metricCard}>
+              <Text style={[styles.metricIcon, { fontSize: adjustSize(22) }]}>💰</Text>
+              <Text style={[styles.metricValue, { fontSize: adjustSize(16) }]} numberOfLines={1}>
+                {amountsVisible ? `${formatAmountInput(metrics.monthlyRevenue)} đ` : '••••••'}
+              </Text>
+              <Text style={[styles.metricTitle, { fontSize: adjustSize(11) }]}>{local('monthly_revenue')}</Text>
+            </View>
 
-          {/* Card 3 */}
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>🏠</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.occupancyRate.toFixed(1)}%</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('occupancy_rate')}</Text>
-          </View>
+            <View style={styles.metricCard}>
+              <Text style={[styles.metricIcon, { fontSize: adjustSize(22) }]}>⚠️</Text>
+              <Text style={[styles.metricValue, { fontSize: adjustSize(16) }]} numberOfLines={1}>
+                {amountsVisible ? `${formatAmountInput(metrics.unpaidBalance)} đ` : '••••••'}
+              </Text>
+              <Text style={[styles.metricTitle, { fontSize: adjustSize(11) }]}>{local('unpaid_balance')}</Text>
+            </View>
 
-          {/* Card 4 */}
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricIcon, { fontSize: adjustSize(24) }]}>📄</Text>
-            <Text style={[styles.metricValue, { fontSize: adjustSize(20) }]}>{metrics.activeLeasesCount}</Text>
-            <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>{local('active_leases')}</Text>
+            <View style={styles.metricCard}>
+              <Text style={[styles.metricIcon, { fontSize: adjustSize(22) }]}>🏠</Text>
+              <Text style={[styles.metricValue, { fontSize: adjustSize(18) }]}>
+                {metrics.occupancyRate.toFixed(1)}%
+              </Text>
+              <Text style={[styles.metricTitle, { fontSize: adjustSize(11) }]}>{local('occupancy_rate')}</Text>
+            </View>
+
+            <View style={styles.metricCard}>
+              <Text style={[styles.metricIcon, { fontSize: adjustSize(22) }]}>📄</Text>
+              <Text style={[styles.metricValue, { fontSize: adjustSize(18) }]}>
+                {metrics.activeLeasesCount}
+              </Text>
+              <Text style={[styles.metricTitle, { fontSize: adjustSize(11) }]}>{local('active_leases')}</Text>
+            </View>
+
+            <View style={[styles.metricCard, styles.metricCardWide]}>
+              <View style={styles.metricWideInner}>
+                <Text style={[styles.metricIcon, { fontSize: adjustSize(22) }]}>📈</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.metricValue, { fontSize: adjustSize(18) }]} numberOfLines={1}>
+                    {amountsVisible ? `${formatAmountInput(metrics.lifetimeRevenue)} đ` : '••••••'}
+                  </Text>
+                  <Text style={[styles.metricTitle, { fontSize: adjustSize(12) }]}>
+                    {local('lifetime_revenue')}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -283,7 +319,7 @@ export default function LandlordDashboard() {
             <View style={styles.ratioContainer}>
               <View style={styles.ratioBar}>
                 {/* Visual Ratio breakdown */}
-                <View style={[styles.ratioSlice, { flex: Math.max(1, metrics.totalRevenue), backgroundColor: '#34C759' }]} />
+                <View style={[styles.ratioSlice, { flex: Math.max(1, metrics.lifetimeRevenue), backgroundColor: '#34C759' }]} />
                 <View style={[styles.ratioSlice, { flex: Math.max(1, metrics.unpaidBalance), backgroundColor: '#FF9500' }]} />
               </View>
 
@@ -315,7 +351,7 @@ export default function LandlordDashboard() {
                 <View key={item.id} style={styles.rowItem}>
                   <View style={styles.rowDetails}>
                     <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.propertyName}</Text>
-                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('payment_amount').replace(':', '')}: {item.dueDate}</Text>
+                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('payment_amount').replace(':', '')}: {formatDisplayDate(item.dueDate)}</Text>
                   </View>
                   <View style={styles.rowValues}>
                     <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>{formatVND(item.amount)}</Text>
@@ -350,7 +386,7 @@ export default function LandlordDashboard() {
                 <View style={styles.reportRow}>
                   <Text style={styles.reportLabel}>{local('collected_income')}</Text>
                   <Text style={[styles.reportValue, { color: '#34C759' }]}>
-                    {formatVNDShort(metrics.totalRevenue)}
+                    {formatVNDShort(metrics.lifetimeRevenue)}
                   </Text>
                 </View>
                 <View style={styles.breakdownRow}>
@@ -362,7 +398,7 @@ export default function LandlordDashboard() {
                 <View style={[styles.breakdownRow, styles.totalRow]}>
                   <Text style={styles.totalLabel}>{local('projected_revenue') || 'Total'}</Text>
                   <Text style={styles.totalValue}>
-                    {formatVNDShort(metrics.totalRevenue + metrics.unpaidBalance)}
+                    {formatVNDShort(metrics.lifetimeRevenue + metrics.unpaidBalance)}
                   </Text>
                 </View>
               </View>
@@ -492,27 +528,61 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40
   },
+  metricsPanel: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E5EA',
+    overflow: 'hidden'
+  },
+  metricsPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4
+  },
+  metricsPanelTitle: {
+    fontWeight: '800',
+    color: '#1C1C1E'
+  },
+  eyeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 12,
+    paddingTop: 8,
     justifyContent: 'space-between'
   },
   metricCard: {
     width: '47%',
     backgroundColor: '#F2F2F7',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2
+    padding: 14,
+    marginBottom: 12
+  },
+  metricCardWide: {
+    width: '100%'
+  },
+  metricWideInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
   },
   metricIcon: {
     fontSize: 24,
-    marginBottom: 12
+    marginBottom: 8
   },
   metricValue: {
     fontSize: 20,

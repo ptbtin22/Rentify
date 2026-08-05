@@ -24,6 +24,7 @@ import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { formatVND } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { excludeFuturePayments } from '../../services/paymentUtils';
  
 export default function LandlordPayments() {
@@ -239,7 +240,7 @@ export default function LandlordPayments() {
               <View style={styles.details}>
                 <Text style={[styles.propertyName, { fontSize: adjustSize(15) }]}>{info.propertyName}</Text>
                 <Text style={[styles.tenantName, { fontSize: adjustSize(12) }]}>{local('tenant_label')} {info.tenantName}</Text>
-                <Text style={[styles.dueDate, { fontSize: adjustSize(12) }]}>{local('due_label')} {pay.dueDate}</Text>
+                <Text style={[styles.dueDate, { fontSize: adjustSize(12) }]}>{local('due_label')} {formatDisplayDate(pay.dueDate)}</Text>
               </View>
               <View style={styles.values}>
                 <Text style={[styles.amount, { fontSize: adjustSize(14) }]}>{formatVND(info.amount)}</Text>
@@ -321,7 +322,7 @@ export default function LandlordPayments() {
                           <View key={p.id} style={[styles.card, { marginHorizontal: 0, marginBottom: 8 }]}>
                             <View style={styles.details}>
                               <Text style={styles.propertyName}>{prop?.name || 'Phòng'}</Text>
-                              <Text style={styles.dueDate}>{local('due_label')} {p.dueDate}</Text>
+                              <Text style={styles.dueDate}>{local('due_label')} {formatDisplayDate(p.dueDate)}</Text>
                             </View>
                             <View style={styles.values}>
                               <Text style={styles.amount}>{formatVND(p.amount)}</Text>

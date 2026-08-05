@@ -17,6 +17,7 @@ import {
 import { Notice, NoticeRepository } from '../services/NoticeRepository';
 import { useLanguage } from '../services/LanguageManager';
 import { useEasyViewMode } from '../services/EasyViewManager';
+import { formatDisplayDate } from '../services/dateUtils';
 
 interface FacebookPostCardProps {
   item: Notice;
@@ -91,7 +92,7 @@ export const FacebookPostCard: React.FC<FacebookPostCardProps> = ({
           </TouchableOpacity>
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>
-              {new Date(item.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+              {formatDisplayDate(item.createdAt)}
             </Text>
             <View style={[styles.badge, { backgroundColor: categoryColor + '15', borderColor: categoryColor }]}>
               <Text style={[styles.badgeText, { color: categoryColor, fontSize: adjustSize(9) }]}>

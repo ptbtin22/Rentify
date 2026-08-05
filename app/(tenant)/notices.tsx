@@ -28,6 +28,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { View as RNView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth, AuthManager } from '../../services/AuthManager';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { NotificationManager } from '../../services/NotificationManager';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
@@ -432,7 +433,7 @@ export default function TenantNotices() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
                     <Text style={styles.posterPostTime}>
-                      {item.createdAt.toLocaleDateString()}
+                      {formatDisplayDate(item.createdAt)}
                     </Text>
                   </View>
                   <Text style={styles.posterPostBody} numberOfLines={2}>{item.body}</Text>

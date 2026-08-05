@@ -30,7 +30,9 @@ import { Database, Property, PropertyType, Lease, Tenant, KhuTro, CustomFee, get
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { useRouter } from 'expo-router';
-import { formatVND } from '../../services/CurrencyUtils';
+import { formatVND, formatAmountInput, parseAmountInput } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
+import { ContractImageViewer } from '../../components/ContractImageViewer';
 
 const CONTRACT_PAGE_WIDTH = Dimensions.get('window').width - 32;
 
@@ -59,6 +61,9 @@ export default function LandlordProperties() {
 
   // Contract pager state
   const [contractPageIndex, setContractPageIndex] = useState(0);
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   // Form Fields for Room
   const [name, setName] = useState('');
@@ -68,8 +73,12 @@ export default function LandlordProperties() {
   // Form Fields for Khu
   const [newKhuName, setNewKhuName] = useState('');
   const [newKhuAddress, setNewKhuAddress] = useState('');
-  const [newKhuRemindDay, setNewKhuRemindDay] = useState('');
-  const [roomRemindDay, setRoomRemindDay] = useState('');
+
+  // Add-room price extras
+  const [parkingFee, setParkingFee] = useState('');
+  const [addCustomFees, setAddCustomFees] = useState<CustomFee[]>([]);
+  const [addFeeName, setAddFeeName] = useState('');
+  const [addFeeAmount, setAddFeeAmount] = useState('');
 
   // Dropdown states
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -105,14 +114,28 @@ export default function LandlordProperties() {
   const { local, localF, language } = useLanguage();
   const { isEasyView, adjustSize } = useEasyViewMode();
   const [propertyType, setPropertyType] = useState<PropertyType>('Apartment');
-  const [rentAmount, setRentAmount] = useState('1500');
+  const [rentAmount, setRentAmount] = useState(formatAmountInput(3500000));
   const [bedrooms, setBedrooms] = useState(2);
   const [bathrooms, setBathrooms] = useState(1);
-  const [electricityRate, setElectricityRate] = useState('3500');
-  const [waterRate, setWaterRate] = useState('100000');
-  const [serviceFee, setServiceFee] = useState('50000');
+  const [electricityRate, setElectricityRate] = useState(formatAmountInput(3500));
+  const [waterRate, setWaterRate] = useState(formatAmountInput(100000));
+  const [serviceFee, setServiceFee] = useState(formatAmountInput(50000));
 
-  const types: PropertyType[] = ['Apartment', 'House', 'Condo', 'Townhouse'];
+  const types: PropertyType[] = ['Apartment', 'House'];
+
+  const prefillAddressFromKhu = (khuId: string) => {
+    const khu = Database.getKhuTros().find(k => k.id === khuId) || khuTros.find(k => k.id === khuId);
+    if (khu) setAddress(khu.address);
+  };
+
+  const openAddRoomModal = () => {
+    const khuId = selectedKhuTroId || (khuTros[0]?.id ?? '');
+    if (khuId) {
+      setSelectedKhuTroId(khuId);
+      prefillAddressFromKhu(khuId);
+    }
+    setIsAddVisible(true);
+  };
 
   const refreshData = () => {
     const props = Database.getProperties();
@@ -137,34 +160,38 @@ export default function LandlordProperties() {
   }, []);
 
   const handleSave = () => {
-    if (!name.trim() || !address.trim() || isNaN(Number(rentAmount))) return;
+    const rent = parseAmountInput(rentAmount);
+    if (!name.trim() || !address.trim() || rent <= 0) return;
 
-    const remindDayNum = Number(roomRemindDay);
     Database.addProperty({
       name,
       khuTroId: selectedKhuTroId,
       address,
       propertyType,
-      rentAmount: Number(rentAmount),
+      rentAmount: rent,
       bedrooms,
       bathrooms,
-      electricityRate: Number(electricityRate),
-      waterRate: Number(waterRate),
-      serviceFee: Number(serviceFee),
-      remindDay: remindDayNum > 0 && remindDayNum <= 28 ? remindDayNum : undefined
+      electricityRate: parseAmountInput(electricityRate),
+      waterRate: parseAmountInput(waterRate),
+      serviceFee: parseAmountInput(serviceFee),
+      parkingFee: parkingFee === '' ? undefined : parseAmountInput(parkingFee),
+      customFees: addCustomFees.length > 0 ? addCustomFees : undefined
     });
 
     // Reset Form
     setName('');
     setAddress('');
     setPropertyType('Apartment');
-    setRentAmount('1500');
+    setRentAmount(formatAmountInput(3500000));
     setBedrooms(2);
     setBathrooms(1);
-    setElectricityRate('3500');
-    setWaterRate('100000');
-    setServiceFee('50000');
-    setRoomRemindDay('');
+    setElectricityRate(formatAmountInput(3500));
+    setWaterRate(formatAmountInput(100000));
+    setServiceFee(formatAmountInput(50000));
+    setParkingFee('');
+    setAddCustomFees([]);
+    setAddFeeName('');
+    setAddFeeAmount('');
     setIsAddVisible(false);
   };
 
@@ -191,15 +218,9 @@ export default function LandlordProperties() {
       Alert.alert(local('required_title'), local('khu_fields_required_desc'));
       return;
     }
-    const remindDayNum = Number(newKhuRemindDay);
-    Database.addKhuTro(
-      newKhuName.trim(), 
-      newKhuAddress.trim(), 
-      remindDayNum > 0 && remindDayNum <= 28 ? remindDayNum : undefined
-    );
+    Database.addKhuTro(newKhuName.trim(), newKhuAddress.trim());
     setNewKhuName('');
     setNewKhuAddress('');
-    setNewKhuRemindDay('');
     refreshData();
     setIsKhuModalVisible(false);
     showToast(local('complex_success_desc'));
@@ -385,19 +406,26 @@ export default function LandlordProperties() {
   }
 
   const openAddMenu = () => {
-    const options = [local('cancel'), local('add_menu_room'), local('add_menu_complex')];
+    const options = [
+      local('cancel'),
+      local('add_menu_room'),
+      local('add_menu_complex'),
+      local('add_menu_lease')
+    ];
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { options, cancelButtonIndex: 0 },
         (idx) => {
-          if (idx === 1) setIsAddVisible(true);
+          if (idx === 1) openAddRoomModal();
           if (idx === 2) setIsKhuModalVisible(true);
+          if (idx === 3) router.push('/(landlord)/create-lease');
         }
       );
     } else {
       Alert.alert(local('add_room'), undefined, [
-        { text: local('add_menu_room'), onPress: () => setIsAddVisible(true) },
+        { text: local('add_menu_room'), onPress: openAddRoomModal },
         { text: local('add_menu_complex'), onPress: () => setIsKhuModalVisible(true) },
+        { text: local('add_menu_lease'), onPress: () => router.push('/(landlord)/create-lease') },
         { text: local('cancel'), style: 'cancel' },
       ]);
     }
@@ -646,7 +674,7 @@ export default function LandlordProperties() {
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.khuListName, { fontSize: adjustSize(14) }]}>{p.notes || local('base_rent')}</Text>
                           <Text style={[styles.khuListAddr, { fontSize: adjustSize(12) }]}>
-                            {tenant?.name || local('unknown_tenant')} • {local('due_label')} {p.dueDate}
+                            {tenant?.name || local('unknown_tenant')} • {local('due_label')} {formatDisplayDate(p.dueDate)}
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -721,7 +749,9 @@ export default function LandlordProperties() {
                     {hist.map(lease => (
                       <View key={lease.id} style={styles.leaseRow}>
                         <Text style={styles.leaseTenant}>{lease.tenantName}</Text>
-                        <Text style={styles.leaseDates}>{lease.startDate} — {lease.endDate}</Text>
+                        <Text style={styles.leaseDates}>
+                          {formatDisplayDate(lease.startDate)} — {formatDisplayDate(lease.endDate)}
+                        </Text>
                       </View>
                     ))}
                   </View>
@@ -849,12 +879,21 @@ export default function LandlordProperties() {
                           style={styles.contractPager}
                         >
                           {photos.map((uri, idx) => (
-                            <Image
+                            <TouchableOpacity
                               key={`contract-${idx}`}
-                              source={{ uri }}
-                              style={styles.contractPhoto}
-                              resizeMode="cover"
-                            />
+                              activeOpacity={0.9}
+                              onPress={() => {
+                                setViewerUris(photos);
+                                setViewerIndex(idx);
+                                setViewerVisible(true);
+                              }}
+                            >
+                              <Image
+                                source={{ uri }}
+                                style={styles.contractPhoto}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
                           ))}
                         </ScrollView>
                         <Text style={styles.contractPageText}>
@@ -951,17 +990,6 @@ export default function LandlordProperties() {
                   onChangeText={setNewKhuAddress}
                 />
               </View>
-              <View style={styles.inputBox}>
-                <TextInput
-                  style={[styles.textInput, { fontSize: adjustSize(15) }]}
-                  placeholder={local('remind_day_khu_optional_label')}
-                  placeholderTextColor="#8E8E93"
-                  value={newKhuRemindDay}
-                  onChangeText={setNewKhuRemindDay}
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
-              </View>
               <TouchableOpacity style={styles.addKhuSubmitBtn} onPress={handleSaveKhu}>
                 <Text style={[styles.addKhuSubmitText, { fontSize: adjustSize(14) }]}>{local('add_complex')}</Text>
               </TouchableOpacity>
@@ -1052,6 +1080,7 @@ export default function LandlordProperties() {
                           ]}
                           onPress={() => {
                             setSelectedKhuTroId(k.id);
+                            prefillAddressFromKhu(k.id);
                             setIsDropdownOpen(false);
                           }}
                         >
@@ -1125,9 +1154,11 @@ export default function LandlordProperties() {
                   style={styles.numberInput}
                   keyboardType="numeric"
                   value={rentAmount}
-                  onChangeText={setRentAmount}
+                  onChangeText={(v) => setRentAmount(formatAmountInput(v))}
                 />
               </View>
+
+              <Text style={styles.label}>{local('price_details')}</Text>
 
               <View style={styles.inputBoxRow}>
                 <Text style={styles.rowLabel}>{local('electricity_kwh_label')}</Text>
@@ -1135,7 +1166,7 @@ export default function LandlordProperties() {
                   style={styles.numberInput}
                   keyboardType="numeric"
                   value={electricityRate}
-                  onChangeText={setElectricityRate}
+                  onChangeText={(v) => setElectricityRate(formatAmountInput(v))}
                 />
               </View>
 
@@ -1145,7 +1176,7 @@ export default function LandlordProperties() {
                   style={styles.numberInput}
                   keyboardType="numeric"
                   value={waterRate}
-                  onChangeText={setWaterRate}
+                  onChangeText={(v) => setWaterRate(formatAmountInput(v))}
                 />
               </View>
 
@@ -1155,19 +1186,87 @@ export default function LandlordProperties() {
                   style={styles.numberInput}
                   keyboardType="numeric"
                   value={serviceFee}
-                  onChangeText={setServiceFee}
+                  onChangeText={(v) => setServiceFee(formatAmountInput(v))}
                 />
               </View>
 
               <View style={styles.inputBoxRow}>
-                <Text style={styles.rowLabel}>{local('remind_day_optional_label')}</Text>
+                <Text style={styles.rowLabel}>{local('parking_fee_optional')}</Text>
                 <TextInput
                   style={styles.numberInput}
                   keyboardType="numeric"
-                  value={roomRemindDay}
-                  onChangeText={setRoomRemindDay}
-                  maxLength={2}
+                  value={parkingFee}
+                  onChangeText={(v) => setParkingFee(formatAmountInput(v))}
                 />
+              </View>
+
+              {addCustomFees.map(fee => (
+                <View key={fee.id} style={styles.inputBoxRow}>
+                  <TextInput
+                    style={[styles.rowLabel, { flex: 1 }]}
+                    value={fee.name}
+                    onChangeText={(v) =>
+                      setAddCustomFees(prev => prev.map(f => (f.id === fee.id ? { ...f, name: v } : f)))
+                    }
+                  />
+                  <TextInput
+                    style={styles.numberInput}
+                    keyboardType="numeric"
+                    value={formatAmountInput(fee.amount)}
+                    onChangeText={(v) =>
+                      setAddCustomFees(prev =>
+                        prev.map(f => (f.id === fee.id ? { ...f, amount: parseAmountInput(v) } : f))
+                      )
+                    }
+                  />
+                  <TouchableOpacity
+                    onPress={() => setAddCustomFees(prev => prev.filter(f => f.id !== fee.id))}
+                    hitSlop={8}
+                    style={{ marginLeft: 8 }}
+                  >
+                    <Text style={{ color: '#FF3B30', fontWeight: '900' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <View style={styles.addFeeRow}>
+                <TextInput
+                  style={styles.addFeeName}
+                  placeholder={local('custom_fee_name')}
+                  placeholderTextColor="#8E8E93"
+                  value={addFeeName}
+                  onChangeText={setAddFeeName}
+                />
+                <TextInput
+                  style={styles.addFeeAmount}
+                  placeholder={local('custom_fee_amount')}
+                  placeholderTextColor="#8E8E93"
+                  keyboardType="numeric"
+                  value={addFeeAmount}
+                  onChangeText={(v) => setAddFeeAmount(formatAmountInput(v))}
+                />
+                <TouchableOpacity
+                  style={styles.addRoomFeeBtn}
+                  onPress={() => {
+                    const amount = parseAmountInput(addFeeAmount);
+                    if (!addFeeName.trim() || amount <= 0) {
+                      Alert.alert(local('invalid_fee_title'), local('invalid_fee_desc'));
+                      return;
+                    }
+                    setAddCustomFees(prev => [
+                      ...prev,
+                      {
+                        id: 'fee-' + Math.random().toString(36).substring(7),
+                        name: addFeeName.trim(),
+                        amount
+                      }
+                    ]);
+                    setAddFeeName('');
+                    setAddFeeAmount('');
+                  }}
+                >
+                  <Text style={styles.addRoomFeeBtnText}>{local('add_custom_fee')}</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Bedroom Stepper */}
@@ -1189,13 +1288,13 @@ export default function LandlordProperties() {
                 </View>
               </View>
 
-              {/* Bathroom Stepper */}
+              {/* Bathroom Stepper — min 0 (shared external WC) */}
               <View style={styles.stepperRow}>
                 <Text style={styles.rowLabel}>{localF('bathrooms_count_label', { count: bathrooms })}</Text>
                 <View style={styles.stepperButtons}>
                   <TouchableOpacity
                     style={styles.stepperBtn}
-                    onPress={() => setBathrooms(Math.max(1, bathrooms - 1))}
+                    onPress={() => setBathrooms(Math.max(0, bathrooms - 1))}
                   >
                     <Text style={styles.stepperBtnText}>-</Text>
                   </TouchableOpacity>
@@ -1207,6 +1306,13 @@ export default function LandlordProperties() {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => setIsAddVisible(false)}
+              >
+                <Text style={styles.deleteBtnText}>{local('cancel')}</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -1232,6 +1338,13 @@ export default function LandlordProperties() {
           <Text style={styles.toastText}>{toastMessage}</Text>
         </Animated.View>
       )}
+
+      <ContractImageViewer
+        visible={viewerVisible}
+        uris={viewerUris}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1782,5 +1895,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     textAlign: 'center'
+  },
+  addFeeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12
+  },
+  addFeeName: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: '#1C1C1E'
+  },
+  addFeeAmount: {
+    width: 110,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    textAlign: 'right',
+    color: '#1C1C1E'
+  },
+  addRoomFeeBtn: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12
+  },
+  addRoomFeeBtnText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 11
   }
 });

@@ -24,6 +24,8 @@ import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { ProfileModal } from '../../components/ProfileModal';
 
+const zaloIcon = require('../../assets/zalo_icon.png');
+
 interface CommunityMember {
   tenantId: string;
   name: string;
@@ -166,7 +168,7 @@ export default function TenantCommunity() {
                   });
                 }}
               >
-                <Text style={[styles.actionIcon, { fontSize: adjustSize(12) }]}>💬</Text>
+                <Image source={zaloIcon} style={styles.zaloIcon} resizeMode="contain" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.callBtn}
@@ -293,9 +295,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF20',
+    backgroundColor: '#0068FF15',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    overflow: 'hidden'
+  },
+  zaloIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6
   },
   callBtn: {
     width: 40,

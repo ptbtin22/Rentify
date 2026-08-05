@@ -14,11 +14,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Database, Lease, Payment, Property, Tenant } from '../../services/Database';
+import { Database, Lease, Payment, Property, Tenant, getLeaseContractPhotos } from '../../services/Database';
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { formatVND } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { excludeFuturePayments } from '../../services/paymentUtils';
+import { ContractImageViewer } from '../../components/ContractImageViewer';
 
 type TabKey = 'info' | 'payments' | 'leases';
 
@@ -33,6 +35,9 @@ export default function RoomDetailScreen() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tab, setTab] = useState<TabKey>('info');
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   useEffect(() => {
     const initial = params.initialTab;
@@ -221,7 +226,7 @@ export default function RoomDetailScreen() {
                 return (
                   <View key={p.id} style={styles.listRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.value}>{local('due_label')} {p.dueDate}</Text>
+                      <Text style={styles.value}>{local('due_label')} {formatDisplayDate(p.dueDate)}</Text>
                       <Text style={styles.sub}>{formatVND(p.amount)}</Text>
                     </View>
                     <Text style={{ color: isPaid ? '#34C759' : '#FF9500', fontWeight: '700' }}>
@@ -241,24 +246,58 @@ export default function RoomDetailScreen() {
             ) : (
               roomLeases.map(l => {
                 const t = tenants.find(x => x.id === l.tenantId);
+                const photos = getLeaseContractPhotos(l);
                 return (
-                  <View key={l.id} style={styles.listRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.value}>{t?.name || local('unknown_tenant')}</Text>
-                      <Text style={styles.sub}>
-                        {l.startDate} – {l.endDate}
+                  <View key={l.id} style={styles.leaseCard}>
+                    <View style={styles.leaseHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.value}>{t?.name || local('unknown_tenant')}</Text>
+                        <Text style={styles.sub}>
+                          {formatDisplayDate(l.startDate)} – {formatDisplayDate(l.endDate)}
+                        </Text>
+                        <Text style={styles.sub}>
+                          {formatVND(l.monthlyRent)}/{language === 'vi' ? 'tháng' : 'mo'}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: l.status === 'active' ? '#34C759' : '#8E8E93',
+                          fontWeight: '700',
+                          fontSize: 12
+                        }}
+                      >
+                        {l.status === 'active' ? local('leasing') : l.status}
                       </Text>
-                      <Text style={styles.sub}>{formatVND(l.monthlyRent)}/{language === 'vi' ? 'tháng' : 'mo'}</Text>
                     </View>
-                    <Text
-                      style={{
-                        color: l.status === 'active' ? '#34C759' : '#8E8E93',
-                        fontWeight: '700',
-                        fontSize: 12
-                      }}
-                    >
-                      {l.status === 'active' ? local('leasing') : l.status}
-                    </Text>
+
+                    <Text style={styles.contractLabel}>{local('signed_contract_label')}</Text>
+                    {photos.length === 0 ? (
+                      <Text style={styles.sub}>{local('no_contract_photos_lease')}</Text>
+                    ) : (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.contractThumbRow}
+                      >
+                        {photos.map((uri, idx) => (
+                          <TouchableOpacity
+                            key={`${l.id}-photo-${idx}`}
+                            activeOpacity={0.85}
+                            onPress={() => {
+                              setViewerUris(photos);
+                              setViewerIndex(idx);
+                              setViewerVisible(true);
+                            }}
+                          >
+                            <Image
+                              source={{ uri }}
+                              style={styles.contractThumb}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
                   </View>
                 );
               })
@@ -266,6 +305,13 @@ export default function RoomDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      <ContractImageViewer
+        visible={viewerVisible}
+        uris={viewerUris}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -355,6 +401,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 8
+  },
+  leaseCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10
+  },
+  leaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10
+  },
+  contractLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    marginBottom: 8
+  },
+  contractThumbRow: {
+    gap: 8,
+    paddingRight: 4
+  },
+  contractThumb: {
+    width: 96,
+    height: 128,
+    borderRadius: 8,
+    backgroundColor: '#E5E5EA'
   },
   empty: { color: '#8E8E93', textAlign: 'center', marginTop: 40 }
 });

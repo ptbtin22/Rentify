@@ -22,6 +22,8 @@ import { Database, CustomFee, KhuTro, Property, Tenant } from '../../services/Da
 import { useLanguage } from '../../services/LanguageManager';
 import { useEasyViewMode } from '../../services/EasyViewManager';
 import { formatAmountInput, parseAmountInput } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
+import { ContractImageViewer } from '../../components/ContractImageViewer';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -31,9 +33,6 @@ const formatDate = (date: Date): string => {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
-
-const formatLabel = (date: Date): string =>
-  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function CreateLeaseScreen() {
   const { local, localF } = useLanguage();
@@ -60,6 +59,9 @@ export default function CreateLeaseScreen() {
   const [securityDeposit, setSecurityDeposit] = useState('');
   const [tenantPhoto, setTenantPhoto] = useState<string | undefined>();
   const [contractPhotos, setContractPhotos] = useState<string[]>([]);
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   // Room price components — editable here, saved back onto the room
   const [electricityRate, setElectricityRate] = useState('');
@@ -81,21 +83,36 @@ export default function CreateLeaseScreen() {
     return unsub;
   }, []);
 
-  // Prefill from route params
+  // Prefill from route params — only vacant rooms can be selected for a new lease
   useEffect(() => {
     if (params.tenantId) setSelectedTenantId(params.tenantId);
     if (params.propertyId) {
-      setSelectedPropertyId(params.propertyId);
       const prop = Database.getProperties().find(p => p.id === params.propertyId);
-      if (prop) setSelectedKhuId(prop.khuTroId);
+      if (prop) {
+        setSelectedKhuId(prop.khuTroId);
+        if (!prop.isOccupied) setSelectedPropertyId(params.propertyId);
+      }
     }
   }, [params.tenantId, params.propertyId]);
+
+  // Default tenant attachment photo = that tenant's avatar from when they were added
+  useEffect(() => {
+    if (!selectedTenantId) {
+      setTenantPhoto(undefined);
+      return;
+    }
+    const tenant = Database.getTenants().find(t => t.id === selectedTenantId);
+    setTenantPhoto(tenant?.photoUri);
+  }, [selectedTenantId]);
 
   // Load the selected room's prices into the editable form
   useEffect(() => {
     if (!selectedPropertyId) return;
     const prop = Database.getProperties().find(p => p.id === selectedPropertyId);
-    if (!prop) return;
+    if (!prop || prop.isOccupied) {
+      setSelectedPropertyId('');
+      return;
+    }
     setMonthlyRent(formatAmountInput(prop.rentAmount));
     setSecurityDeposit(formatAmountInput(prop.rentAmount));
     setElectricityRate(formatAmountInput(prop.electricityRate ?? ''));
@@ -113,13 +130,17 @@ export default function CreateLeaseScreen() {
     return khuTros.filter(k => k.name.toLowerCase().includes(q) || k.address.toLowerCase().includes(q));
   }, [khuTros, khuQuery]);
 
-  const roomsInKhu = useMemo(() => {
+  const vacantRoomsInKhu = useMemo(() => {
     if (!selectedKhuId) return [];
+    return properties.filter(p => p.khuTroId === selectedKhuId && !p.isOccupied);
+  }, [properties, selectedKhuId]);
+
+  const roomsInKhu = useMemo(() => {
     const q = roomQuery.trim().toLowerCase();
-    return properties
-      .filter(p => p.khuTroId === selectedKhuId)
-      .filter(p => !q || p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
-  }, [properties, selectedKhuId, roomQuery]);
+    return vacantRoomsInKhu.filter(
+      p => !q || p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
+    );
+  }, [vacantRoomsInKhu, roomQuery]);
 
   const filteredTenants = useMemo(() => {
     const q = tenantQuery.trim().toLowerCase();
@@ -254,78 +275,101 @@ export default function CreateLeaseScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Complex */}
-        <Text style={styles.section}>{local('select_complex_first')}</Text>
-        <TextInput
-          style={styles.search}
-          placeholder={local('search_complex')}
-          placeholderTextColor="#8E8E93"
-          value={khuQuery}
-          onChangeText={setKhuQuery}
-        />
-        {filteredKhu.map(k => (
-          <TouchableOpacity
-            key={k.id}
-            style={[styles.row, selectedKhuId === k.id && styles.rowActive]}
-            onPress={() => {
-              setSelectedKhuId(k.id);
-              setSelectedPropertyId('');
-              setRoomQuery('');
-            }}
-          >
-            <Text style={[styles.rowTitle, selectedKhuId === k.id && styles.rowTitleActive]}>{k.name}</Text>
-            <Text style={styles.rowSub}>{k.address}</Text>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.section}>{local('select_complex_section')}</Text>
+          <TextInput
+            style={styles.search}
+            placeholder={local('search_complex')}
+            placeholderTextColor="#8E8E93"
+            value={khuQuery}
+            onChangeText={setKhuQuery}
+          />
+          {filteredKhu.map(k => (
+            <TouchableOpacity
+              key={k.id}
+              style={[styles.row, selectedKhuId === k.id && styles.rowActive]}
+              onPress={() => {
+                setSelectedKhuId(k.id);
+                setSelectedPropertyId('');
+                setRoomQuery('');
+              }}
+            >
+              <Text style={[styles.rowTitle, selectedKhuId === k.id && styles.rowTitleActive]}>{k.name}</Text>
+              <Text style={styles.rowSub}>{k.address}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {/* Rooms */}
-        <Text style={styles.section}>{local('select_property_label')}</Text>
-        {!selectedKhuId ? (
-          <Text style={styles.hint}>{local('select_complex_first')}</Text>
-        ) : (
-          <>
-            <TextInput
-              style={styles.search}
-              placeholder={local('search_room')}
-              placeholderTextColor="#8E8E93"
-              value={roomQuery}
-              onChangeText={setRoomQuery}
-            />
-            {roomsInKhu.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.row, selectedPropertyId === p.id && styles.rowActive]}
-                onPress={() => setSelectedPropertyId(p.id)}
-              >
-                <Text style={[styles.rowTitle, selectedPropertyId === p.id && styles.rowTitleActive]}>
-                  {p.name} ({p.isOccupied ? local('occupied') : local('vacant')})
-                </Text>
-                <Text style={styles.rowSub}>{p.address}</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
+        <View style={styles.sectionDivider} />
+
+        {/* Rooms — vacant only */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.section}>{local('select_room_section')}</Text>
+          {!selectedKhuId ? (
+            <Text style={styles.hint}>{local('select_complex_first')}</Text>
+          ) : vacantRoomsInKhu.length === 0 ? (
+            <View style={styles.emptyVacantBox}>
+              <Text style={styles.emptyVacantIcon}>🏠</Text>
+              <Text style={styles.emptyVacantTitle}>{local('no_vacant_rooms')}</Text>
+              <Text style={styles.emptyVacantHint}>{local('no_vacant_rooms_hint')}</Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.search}
+                placeholder={local('search_room')}
+                placeholderTextColor="#8E8E93"
+                value={roomQuery}
+                onChangeText={setRoomQuery}
+              />
+              {roomsInKhu.length === 0 ? (
+                <Text style={styles.hint}>{local('no_vacant_rooms')}</Text>
+              ) : (
+                roomsInKhu.map(p => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.row, selectedPropertyId === p.id && styles.rowActive]}
+                    onPress={() => setSelectedPropertyId(p.id)}
+                  >
+                    <Text style={[styles.rowTitle, selectedPropertyId === p.id && styles.rowTitleActive]}>
+                      {p.name} ({local('vacant')})
+                    </Text>
+                    <Text style={styles.rowSub}>{p.address}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </>
+          )}
+        </View>
+
+        <View style={styles.sectionDivider} />
 
         {/* Tenants */}
-        <Text style={styles.section}>{local('select_tenant_label')}</Text>
-        <TextInput
-          style={styles.search}
-          placeholder={local('search_tenant')}
-          placeholderTextColor="#8E8E93"
-          value={tenantQuery}
-          onChangeText={setTenantQuery}
-        />
-        {filteredTenants.map(t => (
-          <TouchableOpacity
-            key={t.id}
-            style={[styles.row, selectedTenantId === t.id && styles.rowActive]}
-            onPress={() => setSelectedTenantId(t.id)}
-          >
-            <Text style={[styles.rowTitle, selectedTenantId === t.id && styles.rowTitleActive]}>{t.name}</Text>
-            <Text style={styles.rowSub}>{t.phone}</Text>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.section}>{local('select_tenant_section')}</Text>
+          <TextInput
+            style={styles.search}
+            placeholder={local('search_tenant')}
+            placeholderTextColor="#8E8E93"
+            value={tenantQuery}
+            onChangeText={setTenantQuery}
+          />
+          {filteredTenants.map(t => (
+            <TouchableOpacity
+              key={t.id}
+              style={[styles.row, selectedTenantId === t.id && styles.rowActive]}
+              onPress={() => setSelectedTenantId(t.id)}
+            >
+              <Text style={[styles.rowTitle, selectedTenantId === t.id && styles.rowTitleActive]}>{t.name}</Text>
+              <Text style={styles.rowSub}>{t.phone}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.sectionDivider} />
 
         {/* Terms */}
+        <View style={styles.sectionBlock}>
         <Text style={styles.section}>{local('lease_terms_section')}</Text>
 
         <TouchableOpacity
@@ -336,7 +380,7 @@ export default function CreateLeaseScreen() {
           }}
         >
           <Text style={styles.dateLabel}>{local('start_date_label')}</Text>
-          <Text style={styles.dateValue}>{formatLabel(startDate)}</Text>
+          <Text style={styles.dateValue}>{formatDisplayDate(startDate)}</Text>
         </TouchableOpacity>
         {showStartPicker && (
           <DateTimePicker
@@ -356,7 +400,7 @@ export default function CreateLeaseScreen() {
           }}
         >
           <Text style={styles.dateLabel}>{local('end_date_label')}</Text>
-          <Text style={styles.dateValue}>{formatLabel(endDate)}</Text>
+          <Text style={styles.dateValue}>{formatDisplayDate(endDate)}</Text>
         </TouchableOpacity>
         {showEndPicker && (
           <DateTimePicker
@@ -387,8 +431,12 @@ export default function CreateLeaseScreen() {
             onChangeText={(v) => setSecurityDeposit(formatAmountInput(v))}
           />
         </View>
+        </View>
+
+        <View style={styles.sectionDivider} />
 
         {/* Room price components — edits are saved back onto the room */}
+        <View style={styles.sectionBlock}>
         <Text style={styles.section}>{local('price_details')}</Text>
         {!selectedPropertyId ? (
           <Text style={styles.hint}>{local('select_property_label')}</Text>
@@ -482,7 +530,11 @@ export default function CreateLeaseScreen() {
             </View>
           </>
         )}
+        </View>
 
+        <View style={styles.sectionDivider} />
+
+        <View style={styles.sectionBlock}>
         <Text style={styles.section}>{local('attachments_photos_section')}</Text>
         <TouchableOpacity style={styles.attachBtn} onPress={() => pickAttachment('tenant')}>
           <Text style={styles.attachText}>
@@ -492,7 +544,16 @@ export default function CreateLeaseScreen() {
         {tenantPhoto && (
           <View style={styles.thumbRow}>
             <View style={styles.thumbWrapper}>
-              <Image source={{ uri: tenantPhoto }} style={styles.thumb} />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  setViewerUris([tenantPhoto]);
+                  setViewerIndex(0);
+                  setViewerVisible(true);
+                }}
+              >
+                <Image source={{ uri: tenantPhoto }} style={styles.thumb} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.thumbRemoveBtn}
                 onPress={() => setTenantPhoto(undefined)}
@@ -516,7 +577,16 @@ export default function CreateLeaseScreen() {
           <View style={styles.thumbRow}>
             {contractPhotos.map((uri, idx) => (
               <View key={`${uri}-${idx}`} style={styles.thumbWrapper}>
-                <Image source={{ uri }} style={styles.thumb} />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setViewerUris(contractPhotos);
+                    setViewerIndex(idx);
+                    setViewerVisible(true);
+                  }}
+                >
+                  <Image source={{ uri }} style={styles.thumb} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.thumbRemoveBtn}
                   onPress={() => setContractPhotos(prev => prev.filter((_, i) => i !== idx))}
@@ -528,7 +598,15 @@ export default function CreateLeaseScreen() {
             ))}
           </View>
         )}
+        </View>
       </ScrollView>
+
+      <ContractImageViewer
+        visible={viewerVisible}
+        uris={viewerUris}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -548,13 +626,45 @@ const styles = StyleSheet.create({
   headerBtn: { color: '#007AFF', fontWeight: '600', fontSize: 16 },
   headerBtnSave: { color: '#007AFF', fontWeight: '800', fontSize: 16 },
   scroll: { flex: 1, paddingHorizontal: 16 },
+  sectionBlock: {
+    paddingTop: 4,
+    paddingBottom: 4
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#C7C7CC',
+    marginTop: 12,
+    marginBottom: 4
+  },
   section: {
-    marginTop: 20,
+    marginTop: 12,
     marginBottom: 8,
     fontSize: 12,
     fontWeight: '800',
     color: '#8E8E93',
     textTransform: 'uppercase'
+  },
+  emptyVacantBox: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  emptyVacantIcon: { fontSize: 36, marginBottom: 8 },
+  emptyVacantTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 6
+  },
+  emptyVacantHint: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 18
   },
   search: {
     backgroundColor: '#F2F2F7',

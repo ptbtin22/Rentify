@@ -32,9 +32,11 @@ import { useLanguage } from '../../services/LanguageManager';
 import { ProfileModal } from '../../components/ProfileModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { PostDetailModal } from '../../components/PostDetailModal';
+import { ContractImageViewer } from '../../components/ContractImageViewer';
 import { Notice } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import { formatVND } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
 import {
   calcConsumptionKwh,
   formatMeterReading,
@@ -58,6 +60,9 @@ export default function TenantPortal() {
   const [isContractVisible, setIsContractVisible] = useState(false);
   const [contractPage, setContractPage] = useState(0);
   const [contractPagerWidth, setContractPagerWidth] = useState(0);
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerVisible, setViewerVisible] = useState(false);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
   const [isRoomInfoVisible, setIsRoomInfoVisible] = useState(false);
   const [isProfileVisible, setIsProfileVisible] = useState(false);
@@ -361,7 +366,7 @@ export default function TenantPortal() {
               <Text style={[styles.detailLabel, { fontSize: adjustSize(13) }]}>{local('lease_duration')}</Text>
               <Text style={[styles.detailValue, { fontSize: adjustSize(13) }]}>
                 {activeLease
-                  ? `${activeLease.startDate} - ${activeLease.endDate}`
+                  ? `${formatDisplayDate(activeLease.startDate)} - ${formatDisplayDate(activeLease.endDate)}`
                   : 'Aug 1, 2026 - Jul 31, 2027'}
               </Text>
             </View>
@@ -393,8 +398,8 @@ export default function TenantPortal() {
                 </Text>
                 <Text style={styles.expirationBannerDesc}>
                   {language === 'vi'
-                    ? `Hợp đồng phòng sẽ hết hạn vào ngày ${activeLease.endDate}. Còn lại ${daysRemaining} ngày.`
-                    : `Your room lease agreement expires on ${activeLease.endDate}. ${daysRemaining} days remaining.`}
+                    ? `Hợp đồng phòng sẽ hết hạn vào ngày ${formatDisplayDate(activeLease.endDate)}. Còn lại ${daysRemaining} ngày.`
+                    : `Your room lease agreement expires on ${formatDisplayDate(activeLease.endDate)}. ${daysRemaining} days remaining.`}
                 </Text>
               </View>
             </View>
@@ -469,7 +474,7 @@ export default function TenantPortal() {
                 <View key={item.id} style={styles.rowItem}>
                   <View style={styles.rowDetails}>
                     <Text style={[styles.rowPropName, { fontSize: adjustSize(14) }]}>{item.notes || local('your_payments')}</Text>
-                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('due_label')} {item.dueDate}</Text>
+                    <Text style={[styles.rowDate, { fontSize: adjustSize(11) }]}>{local('due_label')} {formatDisplayDate(item.dueDate)}</Text>
                   </View>
                   <View style={styles.rowValues}>
                     <Text style={[styles.rowAmount, { fontSize: adjustSize(14) }]}>{formatVND(item.amount)}</Text>
@@ -816,12 +821,21 @@ export default function TenantPortal() {
                       style={{ width: contractPagerWidth, height: 420, borderRadius: 12 }}
                     >
                       {contractPhotos.map((uri, idx) => (
-                        <Image
+                        <TouchableOpacity
                           key={idx}
-                          source={{ uri }}
-                          resizeMode="contain"
-                          style={{ width: contractPagerWidth, height: 420, borderRadius: 12, backgroundColor: '#F2F2F7' }}
-                        />
+                          activeOpacity={0.9}
+                          onPress={() => {
+                            setViewerUris(contractPhotos);
+                            setViewerIndex(idx);
+                            setViewerVisible(true);
+                          }}
+                        >
+                          <Image
+                            source={{ uri }}
+                            resizeMode="contain"
+                            style={{ width: contractPagerWidth, height: 420, borderRadius: 12, backgroundColor: '#F2F2F7' }}
+                          />
+                        </TouchableOpacity>
                       ))}
                     </ScrollView>
                   )}
@@ -846,6 +860,13 @@ export default function TenantPortal() {
           </View>
         </View>
       </Modal>
+
+      <ContractImageViewer
+        visible={viewerVisible}
+        uris={viewerUris}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
 
       {/* ─── Contact Landlord Modal ─── */}
       <Modal visible={isContactModalVisible} animationType="fade" transparent>

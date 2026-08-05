@@ -22,6 +22,7 @@ import { useEasyViewMode } from '../services/EasyViewManager';
 import { NoticeRepository, Notice } from '../services/NoticeRepository';
 import { PostDetailModal } from './PostDetailModal';
 import { createInviteCode, getActiveInvite } from '../services/TenantInviteCode';
+import { formatDisplayDate } from '../services/dateUtils';
 import * as Clipboard from 'expo-clipboard';
 
 interface ProfileModalProps {
@@ -210,7 +211,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose, on
                 <View style={styles.postHeader}>
                   <Text style={[styles.postTitle, { fontSize: adjustSize(13) }]} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.postTime}>
-                    {new Date(item.createdAt).toLocaleDateString()}
+                    {formatDisplayDate(item.createdAt)}
                   </Text>
                 </View>
                 <Text style={[styles.postBody, { fontSize: adjustSize(12) }]} numberOfLines={2}>

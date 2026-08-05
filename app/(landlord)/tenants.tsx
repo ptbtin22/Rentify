@@ -28,6 +28,7 @@ import { useRouter } from 'expo-router';
 import { PhoneInput } from '../../components/PhoneInput';
 import { validatePhone } from '../../services/PhoneUtils';
 import { formatVND } from '../../services/CurrencyUtils';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { getInitials } from '../../services/nameUtils';
 import { excludeFuturePayments } from '../../services/paymentUtils';
 import { verifyCodeForPhone } from '../../services/TenantInviteCode';
@@ -450,7 +451,9 @@ export default function LandlordTenants() {
                     {getTenantLeases(selectedTenant.id).map(lease => (
                       <View key={lease.id} style={styles.leaseRow}>
                         <Text style={styles.leasePropName}>{lease.propertyName}</Text>
-                        <Text style={styles.leaseDates}>{lease.startDate} to {lease.endDate}</Text>
+                        <Text style={styles.leaseDates}>
+                          {formatDisplayDate(lease.startDate)} – {formatDisplayDate(lease.endDate)}
+                        </Text>
                       </View>
                     ))}
                   </View>
@@ -505,7 +508,7 @@ export default function LandlordTenants() {
                             <View key={p.id} style={[styles.leaseRow, { justifyContent: 'space-between' }]}>
                               <View style={{ flex: 1 }}>
                                 <Text style={[styles.leasePropName, { fontSize: adjustSize(13) }]}>{prop?.name || 'Phòng'}</Text>
-                                <Text style={[styles.leaseDates, { fontSize: adjustSize(11) }]}>{local('due_label')} {p.dueDate}</Text>
+                                <Text style={[styles.leaseDates, { fontSize: adjustSize(11) }]}>{local('due_label')} {formatDisplayDate(p.dueDate)}</Text>
                               </View>
                               <View style={{ alignItems: 'flex-end' }}>
                                 <Text style={{ fontSize: adjustSize(13), fontWeight: '700' }}>{formatVND(p.amount)}</Text>

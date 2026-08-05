@@ -28,6 +28,7 @@ import { useLanguage } from '../../services/LanguageManager';
 import { NoticeRepository, Notice, NoticeType } from '../../services/NoticeRepository';
 import { FireConfirmationModal } from '../../components/FireConfirmationModal';
 import { useEasyViewMode } from '../../services/EasyViewManager';
+import { formatDisplayDate } from '../../services/dateUtils';
 import { Database } from '../../services/Database';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
@@ -258,7 +259,7 @@ export default function LandlordNotices() {
                     <View style={styles.pendingHeader}>
                       <Text style={[styles.pendingAuthor, { fontSize: adjustSize(12) }]}>👤 {item.senderName === 'Tenant' ? local('tenant') : item.senderName}</Text>
                       <Text style={styles.pendingTime}>
-                        {new Date(item.createdAt).toLocaleDateString()}
+                        {formatDisplayDate(item.createdAt)}
                       </Text>
                     </View>
                     <Text style={[styles.pendingPostTitle, { fontSize: adjustSize(13) }]}>{item.title}</Text>
@@ -367,7 +368,7 @@ export default function LandlordNotices() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.posterPostTitle}>{item.title}</Text>
                     <Text style={styles.posterPostTime}>
-                      {item.createdAt.toLocaleDateString()}
+                      {formatDisplayDate(item.createdAt)}
                     </Text>
                   </View>
                   <Text style={styles.posterPostBody} numberOfLines={2}>{item.body}</Text>
