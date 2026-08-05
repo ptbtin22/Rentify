@@ -268,19 +268,25 @@ export default function LandlordPayments() {
     }
   }, [selectedPropertyId]);
 
-  const onDateChange = (picker: 'start' | 'end') =>
+  const closeAndroidPicker = (picker: 'start' | 'end') => {
+    if (Platform.OS !== 'android') return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (picker === 'start') setStartMounted(false);
+    else setEndMounted(false);
+  };
+
+  const onDateValueChange = (picker: 'start' | 'end') =>
     (_event: DateTimePickerEvent, selected?: Date) => {
       if (selected) {
         if (picker === 'start') setStartDate(selected);
         else setEndDate(selected);
       }
-      // On Android close picker immediately after selection
-      if (Platform.OS === 'android') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        if (picker === 'start') setStartMounted(false);
-        else setEndMounted(false);
-      }
+      closeAndroidPicker(picker);
     };
+
+  const onDateDismiss = (picker: 'start' | 'end') => () => {
+    closeAndroidPicker(picker);
+  };
 
   const handleCreateLease = () => {
     if (!selectedPropertyId || !selectedTenantId) return;
@@ -667,7 +673,8 @@ export default function LandlordPayments() {
                     value={startDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange('start')}
+                    onValueChange={onDateValueChange('start')}
+                    onDismiss={onDateDismiss('start')}
                     style={{ flex: 1 }}
                   />
                 </View>
@@ -691,7 +698,8 @@ export default function LandlordPayments() {
                     mode="date"
                     minimumDate={startDate}
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange('end')}
+                    onValueChange={onDateValueChange('end')}
+                    onDismiss={onDateDismiss('end')}
                     style={{ flex: 1 }}
                   />
                 </View>

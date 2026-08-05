@@ -31,7 +31,6 @@ import { useEasyViewMode } from '../../services/EasyViewManager';
 import { Database } from '../../services/Database';
 import { BillingConfigModal } from '../../components/BillingConfigModal';
 import { FacebookPostCard } from '../../components/FacebookPostCard';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'react-native';
 import { PostDetailModal } from '../../components/PostDetailModal';
 import * as ImagePicker from 'expo-image-picker';

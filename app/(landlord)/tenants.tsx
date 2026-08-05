@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { PhoneInput } from '../../components/PhoneInput';
 import { validatePhone } from '../../services/PhoneUtils';
 import { formatVND } from '../../services/CurrencyUtils';
+import Clipboard from '@react-native-clipboard/clipboard';
  
 export default function LandlordTenants() {
   const { local, language } = useLanguage();
@@ -434,7 +435,6 @@ export default function LandlordTenants() {
             <TouchableOpacity
               style={styles.copyButton}
               onPress={() => {
-                const Clipboard = require('react-native').Clipboard;
                 Clipboard.setString(
                   `Rentify Login Credentials:\nPhone: ${createdCredentials?.phone}\nPassword: ${createdCredentials?.password}\nPlease change your password in settings after logging in.`
                 );

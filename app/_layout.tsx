@@ -7,24 +7,25 @@
 
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { NotificationManager } from '../services/NotificationManager';
 import { FireBroadcastOverlay } from '../components/FireBroadcastOverlay';
 
 export default function RootLayout() {
   useEffect(() => {
-    NotificationManager.requestPermissions();
+    // Safe no-op in Expo Go Android / web (see NotificationManager)
+    void NotificationManager.requestPermissions();
   }, []);
 
+  // Do not wrap with SafeAreaProvider here — Expo Router's ExpoRoot already provides one.
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="onboarding" options={{ presentation: 'modal' }} />
         <Stack.Screen name="login" />
       </Stack>
       <FireBroadcastOverlay />
-    </SafeAreaProvider>
+    </>
   );
 }

@@ -5,45 +5,21 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-
-// Set up the default foreground notification rules
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true
-  })
-});
-
+/**
+ * Stub notifications for Expo Go / web.
+ *
+ * Do NOT import or require `expo-notifications` here.
+ * On Android Expo Go (SDK 53+), loading that package throws at module init
+ * (DevicePushTokenAutoRegistration.fx → warnOfExpoGoPushUsage) and crashes
+ * the app as ExpoRoot / ContextNavigator / ErrorBoundary errors.
+ *
+ * Local/push notifications need a development build or production binary.
+ * Until then these methods are safe no-ops so the rest of the app can run.
+ */
 export const NotificationManager = {
-  requestPermissions: async (): Promise<boolean> => {
-    if (Platform.OS === 'web') return false;
-    
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    return finalStatus === 'granted';
-  },
+  requestPermissions: async (): Promise<boolean> => false,
 
-  triggerLocalNotification: async (title: string, body: string): Promise<void> => {
-    if (Platform.OS === 'web') return;
-    
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: true
-      },
-      trigger: null // immediate notification
-    });
-  }
+  triggerLocalNotification: async (_title: string, _body: string): Promise<void> => {
+    // no-op in Expo Go / current MVP runtime
+  },
 };
