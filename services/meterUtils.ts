@@ -2,6 +2,8 @@
 //  meterUtils.ts
 //
 
+import type { ImageSourcePropType } from 'react-native';
+
 /** kWh used = current − previous, floored at 0 */
 export function calcConsumptionKwh(previous: number, current: number): number {
   const prev = Number(previous) || 0;
@@ -17,7 +19,23 @@ export function formatMeterReading(value: number | string): string {
   return digits.slice(-METER_DIGITS).padStart(METER_DIGITS, '0');
 }
 
-export const MOCK_PREVIOUS_METER_KWH = 1200;
-export const MOCK_OCR_CURRENT_KWH = 1448;
-export const MOCK_METER_PHOTO_URI =
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600';
+/** Local demo photo of a Vietnamese 1-phase meter. */
+export const MOCK_METER_PHOTO: ImageSourcePropType = require('../assets/dong-ho-dien.jpeg');
+
+/** URI string for components that need `{ uri }` (e.g. ContractImageViewer). */
+export function getMockMeterPhotoUri(): string {
+  try {
+    // Lazy require so Jest (node) can import pure helpers without RN.
+    const { Image } = require('react-native') as typeof import('react-native');
+    const resolved = Image.resolveAssetSource?.(MOCK_METER_PHOTO as number);
+    if (resolved?.uri) return resolved.uri;
+  } catch {
+    // ignore — fall through
+  }
+  return 'asset:/dong-ho-dien.jpeg';
+}
+
+/** Nguyễn Thị An — chỉ số tháng trước (6 số: 020620). */
+export const MOCK_PREVIOUS_METER_KWH = 20620;
+/** Nguyễn Thị An — chỉ số tháng này / OCR (6 số: 020748). */
+export const MOCK_OCR_CURRENT_KWH = 20748;

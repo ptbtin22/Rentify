@@ -11,6 +11,9 @@ jest.mock('react-native', () => ({
     OS: 'ios',
     select: jest.fn(objs => objs.ios),
   },
+  Image: {
+    resolveAssetSource: jest.fn(() => ({ uri: 'mock://dong-ho-dien.jpeg' })),
+  },
 }));
 
 jest.mock('expo-localization', () => ({

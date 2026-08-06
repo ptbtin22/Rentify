@@ -43,7 +43,8 @@ import {
   METER_DIGITS,
   MOCK_PREVIOUS_METER_KWH,
   MOCK_OCR_CURRENT_KWH,
-  MOCK_METER_PHOTO_URI
+  MOCK_METER_PHOTO,
+  getMockMeterPhotoUri,
 } from '../../services/meterUtils';
  
 export default function TenantPortal() {
@@ -100,7 +101,12 @@ export default function TenantPortal() {
           Database.updatePaymentAmountAndStatus(
             currentPaymentForBilling.id,
             finalAmount,
-            'Paid'
+            'Paid',
+            {
+              previousMeterKwh: MOCK_PREVIOUS_METER_KWH,
+              currentMeterKwh: Number(meterKwh) || MOCK_OCR_CURRENT_KWH,
+              meterPhotoUri: getMockMeterPhotoUri(),
+            }
           );
         }
 
@@ -547,9 +553,9 @@ export default function TenantPortal() {
               <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 8 }}>
                 <Text style={styles.sectionLabel}>{local('meter_photo_label')}</Text>
                 <Image
-                  source={{ uri: MOCK_METER_PHOTO_URI }}
-                  style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 12 }}
-                  resizeMode="cover"
+                  source={MOCK_METER_PHOTO}
+                  style={{ width: '100%', height: 200, borderRadius: 12, marginBottom: 12 }}
+                  resizeMode="contain"
                 />
 
                 <Text style={styles.sectionLabel}>{local('meter_reading_section')}</Text>
@@ -818,7 +824,7 @@ export default function TenantPortal() {
                         const idx = Math.round(e.nativeEvent.contentOffset.x / contractPagerWidth);
                         setContractPage(idx);
                       }}
-                      style={{ width: contractPagerWidth, height: 420, borderRadius: 12 }}
+                      style={{ width: contractPagerWidth, height: 520, borderRadius: 12 }}
                     >
                       {contractPhotos.map((uri, idx) => (
                         <TouchableOpacity
@@ -833,7 +839,7 @@ export default function TenantPortal() {
                           <Image
                             source={{ uri }}
                             resizeMode="contain"
-                            style={{ width: contractPagerWidth, height: 420, borderRadius: 12, backgroundColor: '#F2F2F7' }}
+                            style={{ width: contractPagerWidth, height: 520, borderRadius: 12, backgroundColor: '#F2F2F7' }}
                           />
                         </TouchableOpacity>
                       ))}

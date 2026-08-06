@@ -61,8 +61,8 @@ describe('calcConsumptionKwh', () => {
 
 describe('formatMeterReading', () => {
   it('pads readings to 6 digits', () => {
-    expect(formatMeterReading(1200)).toBe('001200');
-    expect(formatMeterReading('1448')).toBe('001448');
+    expect(formatMeterReading(20720)).toBe('020720');
+    expect(formatMeterReading('20748')).toBe('020748');
     expect(METER_DIGITS).toBe(6);
   });
 

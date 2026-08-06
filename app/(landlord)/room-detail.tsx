@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Linking
+  Linking,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +22,14 @@ import { formatVND } from '../../services/CurrencyUtils';
 import { formatDisplayDate } from '../../services/dateUtils';
 import { excludeFuturePayments } from '../../services/paymentUtils';
 import { ContractImageViewer } from '../../components/ContractImageViewer';
+import {
+  calcConsumptionKwh,
+  formatMeterReading,
+  MOCK_METER_PHOTO,
+  getMockMeterPhotoUri,
+  MOCK_PREVIOUS_METER_KWH,
+  MOCK_OCR_CURRENT_KWH,
+} from '../../services/meterUtils';
 
 type TabKey = 'info' | 'payments' | 'leases';
 
@@ -38,6 +47,7 @@ export default function RoomDetailScreen() {
   const [viewerUris, setViewerUris] = useState<string[]>([]);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [selectedPaid, setSelectedPaid] = useState<Payment | null>(null);
 
   useEffect(() => {
     const initial = params.initialTab;
@@ -48,21 +58,16 @@ export default function RoomDetailScreen() {
 
   useEffect(() => {
     const refresh = () => {
+      const id = params.propertyId;
       const props = Database.getProperties();
-      setProperty(props.find(p => p.id === params.propertyId) || null);
+      setProperty(id ? props.find(p => p.id === id) ?? null : null);
       setLeases([...Database.getLeases()]);
       setPayments([...Database.getPayments()]);
       setTenants([...Database.getTenants()]);
     };
-    const unsub = Database.subscribe(refresh);
     refresh();
-    return unsub;
+    return Database.subscribe(refresh);
   }, [params.propertyId]);
-
-  const khuName = useMemo(() => {
-    if (!property) return '';
-    return Database.getKhuTros().find(k => k.id === property.khuTroId)?.name || '';
-  }, [property]);
 
   const activeLease = useMemo(
     () => leases.find(l => l.propertyId === property?.id && l.status === 'active'),
@@ -88,6 +93,29 @@ export default function RoomDetailScreen() {
       .sort((a, b) => b.startDate.localeCompare(a.startDate));
   }, [property, leases]);
 
+  const openMeterPhoto = (payment: Payment) => {
+    const uri = payment.meterPhotoUri || getMockMeterPhotoUri();
+    if (!uri) return;
+    setViewerUris([uri]);
+    setViewerIndex(0);
+    setViewerVisible(true);
+  };
+
+  const paidMeterPrev = selectedPaid?.previousMeterKwh ?? MOCK_PREVIOUS_METER_KWH;
+  const paidMeterCurr = selectedPaid?.currentMeterKwh ?? MOCK_OCR_CURRENT_KWH;
+  const paidConsumption = calcConsumptionKwh(paidMeterPrev, paidMeterCurr);
+
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: 'info', label: local('room_tab_info') },
+    { key: 'payments', label: local('room_tab_payments') },
+    { key: 'leases', label: local('room_tab_leases') },
+  ];
+
+  const khuName = useMemo(() => {
+    if (!property) return '';
+    return Database.getKhuTros().find(k => k.id === property.khuTroId)?.name || '';
+  }, [property]);
+
   if (!property) {
     return (
       <SafeAreaView style={styles.container}>
@@ -102,12 +130,6 @@ export default function RoomDetailScreen() {
       </SafeAreaView>
     );
   }
-
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'info', label: local('room_tab_info') },
-    { key: 'payments', label: local('room_tab_payments') },
-    { key: 'leases', label: local('room_tab_leases') }
-  ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -223,16 +245,26 @@ export default function RoomDetailScreen() {
             ) : (
               roomPayments.map(p => {
                 const isPaid = p.status === 'Paid';
+                const Row = isPaid ? TouchableOpacity : View;
                 return (
-                  <View key={p.id} style={styles.listRow}>
+                  <Row
+                    key={p.id}
+                    style={styles.listRow}
+                    {...(isPaid
+                      ? { onPress: () => setSelectedPaid(p), activeOpacity: 0.75 }
+                      : {})}
+                  >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.value}>{local('due_label')} {formatDisplayDate(p.dueDate)}</Text>
                       <Text style={styles.sub}>{formatVND(p.amount)}</Text>
+                      {isPaid ? (
+                        <Text style={styles.tapHint}>{local('tap_paid_for_meter')}</Text>
+                      ) : null}
                     </View>
                     <Text style={{ color: isPaid ? '#34C759' : '#FF9500', fontWeight: '700' }}>
                       {isPaid ? local('filter_paid') : local('filter_pending')}
                     </Text>
-                  </View>
+                  </Row>
                 );
               })
             )}
@@ -305,6 +337,72 @@ export default function RoomDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!selectedPaid}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedPaid(null)}
+      >
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setSelectedPaid(null)} hitSlop={12}>
+              <Text style={styles.back}>{local('close')}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { fontSize: adjustSize(17) }]} numberOfLines={1}>
+              {local('payment_meter_verify_title')}
+            </Text>
+            <View style={{ width: 48 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            <Text style={styles.verifyHint}>{local('payment_meter_verify_hint')}</Text>
+            {selectedPaid ? (
+              <View style={styles.card}>
+                <Text style={styles.label}>{local('due_label')}</Text>
+                <Text style={styles.value}>{formatDisplayDate(selectedPaid.dueDate)}</Text>
+                <Text style={styles.label}>{local('payment_amount')}</Text>
+                <Text style={styles.value}>{formatVND(selectedPaid.amount)}</Text>
+                {selectedPaid.notes ? (
+                  <>
+                    <Text style={styles.label}>{local('notes')}</Text>
+                    <Text style={styles.value}>{selectedPaid.notes}</Text>
+                  </>
+                ) : null}
+              </View>
+            ) : null}
+
+            <Text style={styles.section}>{local('meter_reading_section')}</Text>
+            <View style={styles.card}>
+              <View style={styles.priceRow}>
+                <Text style={styles.sub}>{local('meter_prev_reading')}</Text>
+                <Text style={styles.value}>{formatMeterReading(paidMeterPrev)}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.sub}>{local('meter_curr_reading')}</Text>
+                <Text style={styles.value}>{formatMeterReading(paidMeterCurr)}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.sub}>{local('meter_consumption')}</Text>
+                <Text style={[styles.value, { color: '#007AFF' }]}>{paidConsumption} kWh</Text>
+              </View>
+            </View>
+
+            <Text style={styles.section}>{local('meter_photo_label')}</Text>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => selectedPaid && openMeterPhoto(selectedPaid)}>
+              <Image
+                source={
+                  selectedPaid?.meterPhotoUri
+                    ? { uri: selectedPaid.meterPhotoUri }
+                    : MOCK_METER_PHOTO
+                }
+                style={styles.meterPhoto}
+                resizeMode="contain"
+              />
+              <Text style={styles.tapHint}>{local('pinch_to_zoom_hint')}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       <ContractImageViewer
         visible={viewerVisible}
@@ -401,6 +499,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 8
+  },
+  tapHint: {
+    fontSize: 11,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginTop: 4
+  },
+  verifyHint: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
+    marginBottom: 14
+  },
+  meterPhoto: {
+    width: '100%',
+    height: 280,
+    borderRadius: 12,
+    backgroundColor: '#F2F2F7',
+    marginBottom: 6
   },
   leaseCard: {
     backgroundColor: '#F2F2F7',

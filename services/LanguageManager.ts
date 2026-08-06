@@ -503,6 +503,13 @@ export const translations: Record<string, Record<Language, string>> = {
   meter_manual_confirm: { en: "I confirm the manually entered kWh reading is accurate", vi: "Tôi xác nhận số kí điện đã nhập tay là chính xác" },
   meter_photo_label: { en: "Meter photo", vi: "Ảnh đồng hồ điện" },
   please_confirm_manual_meter: { en: "Please confirm the manual reading before continuing.", vi: "Vui lòng xác nhận số đã nhập tay trước khi tiếp tục." },
+  payment_meter_verify_title: { en: "Payment verification", vi: "Xác minh thanh toán" },
+  payment_meter_verify_hint: {
+    en: "Review the kWh reading and meter photo submitted by the tenant.",
+    vi: "Đối chiếu số kí điện và ảnh đồng hồ do người thuê gửi để kiểm tra gian lận.",
+  },
+  tap_paid_for_meter: { en: "Tap to view meter evidence", vi: "Bấm để xem ảnh đồng hồ" },
+  no_meter_evidence: { en: "No meter evidence for this payment.", vi: "Khoản này chưa có ảnh đồng hồ điện." },
 };
 
 // Check device language automatically (Q1 requirement)

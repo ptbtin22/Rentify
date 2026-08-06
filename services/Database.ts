@@ -5,6 +5,11 @@
 //  Created by Tin Pham on 27/7/26.
 //
 
+import { getMockContractPhotoUris } from './contractAssets';
+
+/** 6 trang hợp đồng demo (contract-1…6.jpeg) — dùng khi xem hợp đồng. */
+const DEMO_CONTRACT_PHOTOS = getMockContractPhotoUris();
+
 export type PropertyType = 'Apartment' | 'House' | 'Condo' | 'Townhouse';
 export type LeaseStatus = 'active' | 'pending' | 'terminated';
 export type PaymentStatus = 'Paid' | 'Pending' | 'Overdue';
@@ -110,6 +115,11 @@ export interface Payment {
   paymentDate?: string;
   status: PaymentStatus;
   notes: string;
+  /** Meter evidence captured when tenant paid via OCR flow (Paid only). */
+  previousMeterKwh?: number;
+  currentMeterKwh?: number;
+  /** Remote URI if any; otherwise UI falls back to local demo meter photo. */
+  meterPhotoUri?: string;
 }
 
 // Initial Mock Data with full breakdown configurations
@@ -260,12 +270,8 @@ let leases: Lease[] = [
     securityDeposit: 3500000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    contractPhoto: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
-    contractPhotos: [
-      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
-      'https://images.unsplash.com/photo-1554224154-26032ffc0d62?w=800',
-      'https://images.unsplash.com/photo-1586282391129-162a8e70c1d9?w=800',
-    ],
+    contractPhoto: DEMO_CONTRACT_PHOTOS[0],
+    contractPhotos: [...DEMO_CONTRACT_PHOTOS],
     contractUpdatedAt: '2026-06-01T08:00:00.000Z',
   },
   {
@@ -278,11 +284,8 @@ let leases: Lease[] = [
     securityDeposit: 2800000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    contractPhoto: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
-    contractPhotos: [
-      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800',
-      'https://images.unsplash.com/photo-1554224154-26032ffc0d62?w=800',
-    ],
+    contractPhoto: DEMO_CONTRACT_PHOTOS[0],
+    contractPhotos: [...DEMO_CONTRACT_PHOTOS],
     contractUpdatedAt: '2026-07-01T08:00:00.000Z',
   },
   {
@@ -295,7 +298,8 @@ let leases: Lease[] = [
     securityDeposit: 3000000,
     status: 'active',
     tenantPhoto: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=150',
-    contractPhoto: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300'
+    contractPhoto: DEMO_CONTRACT_PHOTOS[0],
+    contractPhotos: [...DEMO_CONTRACT_PHOTOS],
   },
   {
     id: 'lease-4',
@@ -305,7 +309,9 @@ let leases: Lease[] = [
     endDate: '2026-12-31',
     monthlyRent: 3200000,
     securityDeposit: 3200000,
-    status: 'active'
+    status: 'active',
+    contractPhoto: DEMO_CONTRACT_PHOTOS[0],
+    contractPhotos: [...DEMO_CONTRACT_PHOTOS],
   },
   {
     id: 'lease-5',
@@ -315,12 +321,14 @@ let leases: Lease[] = [
     endDate: '2027-03-01',
     monthlyRent: 3500000,
     securityDeposit: 3500000,
-    status: 'active'
+    status: 'active',
+    contractPhoto: DEMO_CONTRACT_PHOTOS[0],
+    contractPhotos: [...DEMO_CONTRACT_PHOTOS],
   }
 ];
 
 let payments: Payment[] = [
-  // lease-1 (Phòng 202) history
+  // lease-1 (Phòng 202 · Nguyễn Thị An)
   {
     id: 'pay-1',
     leaseId: 'lease-1',
@@ -328,7 +336,9 @@ let payments: Payment[] = [
     dueDate: '2026-06-01',
     paymentDate: '2026-06-02',
     status: 'Paid',
-    notes: 'Tháng 6/2026'
+    notes: 'Tháng 6/2026',
+    previousMeterKwh: 1590,
+    currentMeterKwh: 1754,
   },
   {
     id: 'pay-2',
@@ -337,7 +347,10 @@ let payments: Payment[] = [
     dueDate: '2026-07-01',
     paymentDate: '2026-07-03',
     status: 'Paid',
-    notes: 'Tháng 7/2026'
+    notes: 'Tháng 7/2026',
+    // Chốt tháng 7 = chỉ số đầu tháng 8 (tháng trước khi thanh toán tháng 8)
+    previousMeterKwh: 20480,
+    currentMeterKwh: 20620,
   },
   {
     id: 'pay-3',
@@ -346,8 +359,9 @@ let payments: Payment[] = [
     dueDate: '2026-08-01',
     status: 'Pending',
     notes: 'Tháng 8/2026'
+    // Khi thanh toán: 020620 → 020748 (xem meterUtils)
   },
-  // lease-2 (Phòng 104) history
+  // lease-2 (Phòng 104 · Nguyễn Thị An)
   {
     id: 'pay-4',
     leaseId: 'lease-2',
@@ -355,7 +369,9 @@ let payments: Payment[] = [
     dueDate: '2026-07-01',
     paymentDate: '2026-07-02',
     status: 'Paid',
-    notes: 'Tháng 7/2026'
+    notes: 'Tháng 7/2026',
+    previousMeterKwh: 20480,
+    currentMeterKwh: 20620,
   },
   {
     id: 'pay-5',
@@ -364,6 +380,80 @@ let payments: Payment[] = [
     dueDate: '2026-08-01',
     status: 'Pending',
     notes: 'Tháng 8/2026'
+  },
+  // lease-3 (Phòng 105 · Trần Văn Bình) — HĐ bắt đầu 01/08/2026
+  {
+    id: 'pay-6',
+    leaseId: 'lease-3',
+    amount: 3000000,
+    dueDate: '2026-08-01',
+    status: 'Pending',
+    notes: 'Tháng 8/2026'
+  },
+  // lease-4 (Phòng 203 · Lê Thị Chi)
+  {
+    id: 'pay-7',
+    leaseId: 'lease-4',
+    amount: 3200000,
+    dueDate: '2026-06-01',
+    paymentDate: '2026-06-01',
+    status: 'Paid',
+    notes: 'Tháng 6/2026',
+    previousMeterKwh: 2100,
+    currentMeterKwh: 2248,
+  },
+  {
+    id: 'pay-8',
+    leaseId: 'lease-4',
+    amount: 3200000,
+    dueDate: '2026-07-01',
+    paymentDate: '2026-07-05',
+    status: 'Paid',
+    notes: 'Tháng 7/2026',
+    previousMeterKwh: 2248,
+    currentMeterKwh: 2390,
+  },
+  {
+    id: 'pay-9',
+    leaseId: 'lease-4',
+    amount: 3200000,
+    dueDate: '2026-08-01',
+    status: 'Pending',
+    notes: 'Tháng 8/2026'
+  },
+  // lease-5 (Phòng 205 · Phạm Văn Dũng)
+  {
+    id: 'pay-10',
+    leaseId: 'lease-5',
+    amount: 3500000,
+    dueDate: '2026-06-01',
+    paymentDate: '2026-06-03',
+    status: 'Paid',
+    notes: 'Tháng 6/2026',
+    previousMeterKwh: 1914,
+    currentMeterKwh: 2074,
+  },
+  {
+    id: 'pay-11',
+    leaseId: 'lease-5',
+    amount: 3500000,
+    dueDate: '2026-07-01',
+    paymentDate: '2026-07-01',
+    status: 'Paid',
+    notes: 'Tháng 7/2026',
+    previousMeterKwh: 1750,
+    currentMeterKwh: 1910,
+  },
+  {
+    id: 'pay-12',
+    leaseId: 'lease-5',
+    amount: 3500000,
+    dueDate: '2026-08-01',
+    paymentDate: '2026-08-04',
+    status: 'Paid',
+    notes: 'Tháng 8/2026',
+    previousMeterKwh: 1914,
+    currentMeterKwh: 2074,
   }
 ];
 
@@ -563,14 +653,30 @@ export const Database = {
     notify();
   },
 
-  updatePaymentAmountAndStatus: (paymentId: string, amount: number, status: 'Paid' | 'Pending') => {
+  updatePaymentAmountAndStatus: (
+    paymentId: string,
+    amount: number,
+    status: 'Paid' | 'Pending',
+    meterEvidence?: {
+      previousMeterKwh: number;
+      currentMeterKwh: number;
+      meterPhotoUri?: string;
+    }
+  ) => {
     payments = payments.map(p =>
       p.id === paymentId
         ? {
             ...p,
             amount,
             status,
-            paymentDate: status === 'Paid' ? new Date().toISOString().split('T')[0] : p.paymentDate
+            paymentDate: status === 'Paid' ? new Date().toISOString().split('T')[0] : p.paymentDate,
+            ...(meterEvidence
+              ? {
+                  previousMeterKwh: meterEvidence.previousMeterKwh,
+                  currentMeterKwh: meterEvidence.currentMeterKwh,
+                  meterPhotoUri: meterEvidence.meterPhotoUri,
+                }
+              : {}),
           }
         : p
     );
